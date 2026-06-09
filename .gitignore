@@ -1,0 +1,30 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# External tool binaries — too large for git; fetched by `npm run setup`
+# (scripts/setup-tools.ps1, also runs automatically before dev/build)
+src-tauri/binaries/
+src-tauri/resources/ffmpeg.exe
+src-tauri/resources/ffprobe.exe

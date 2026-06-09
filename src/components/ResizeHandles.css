@@ -1,0 +1,60 @@
+.rz {
+  position: fixed;
+  z-index: 1000;
+}
+.rz-n {
+  top: 0;
+  left: 7px;
+  right: 7px;
+  height: 5px;
+  cursor: ns-resize;
+}
+.rz-s {
+  bottom: 0;
+  left: 7px;
+  right: 7px;
+  height: 5px;
+  cursor: ns-resize;
+}
+.rz-e {
+  top: 7px;
+  bottom: 7px;
+  right: 0;
+  width: 5px;
+  cursor: ew-resize;
+}
+.rz-w {
+  top: 7px;
+  bottom: 7px;
+  left: 0;
+  width: 5px;
+  cursor: ew-resize;
+}
+.rz-ne {
+  top: 0;
+  right: 0;
+  width: 8px;
+  height: 8px;
+  cursor: nesw-resize;
+}
+.rz-nw {
+  top: 0;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  cursor: nwse-resize;
+}
+.rz-se {
+  bottom: 0;
+  right: 0;
+  width: 8px;
+  height: 8px;
+  cursor: nwse-resize;
+}
+.rz-sw {
+  bottom: 0;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  cursor: nesw-resize;
+}

@@ -1,0 +1,64 @@
+.playlists-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 28px 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.playlist-create {
+  margin-bottom: 16px;
+}
+.playlist-create input {
+  width: 100%;
+  max-width: 320px;
+  background: var(--bg-elev);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  outline: none;
+}
+
+.playlist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 18px;
+}
+
+.playlist-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--bg-elev);
+  border: 1px solid transparent;
+  text-align: left;
+  transition:
+    background 0.15s var(--ease),
+    border-color 0.15s var(--ease),
+    transform 0.1s var(--ease);
+}
+.playlist-card:hover {
+  background: var(--bg-elev-2);
+  border-color: var(--border);
+}
+.playlist-card:active {
+  transform: scale(0.985);
+}
+.playlist-card .thumb {
+  width: 100% !important;
+  aspect-ratio: 1;
+  height: auto !important;
+  margin-bottom: 8px;
+}
+.playlist-card-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.playlist-card-count {
+  font-size: 12px;
+  color: var(--text-faint);
+}

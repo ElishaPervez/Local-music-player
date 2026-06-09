@@ -1,0 +1,135 @@
+.add-songs {
+  width: 460px;
+  max-width: 92vw;
+  max-height: 76vh;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.add-songs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 14px 12px 18px;
+  font-size: 15px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.add-songs-header b {
+  color: var(--accent-2);
+}
+
+.add-songs-search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 16px 8px;
+  padding: 0 12px;
+  height: 40px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+.add-songs-search:focus-within {
+  border-color: var(--accent);
+}
+.add-songs-search input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text);
+}
+
+.add-songs-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.add-song-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  transition: background 0.12s var(--ease);
+}
+.add-song-row:hover {
+  background: var(--bg-hover);
+}
+.add-song-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.add-song-title {
+  font-weight: 550;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.add-song-artist {
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.add-song-dur {
+  font-size: 12px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.add-song-toggle {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--text-dim);
+  background: var(--bg-hover);
+}
+.add-song-row.added .add-song-toggle {
+  background: var(--accent);
+  color: #fff;
+}
+
+.add-songs-empty {
+  text-align: center;
+  color: var(--text-faint);
+  padding: 40px 20px;
+}
+.add-songs-empty p {
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.add-songs-empty span {
+  font-size: 12px;
+}
+
+.add-songs-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+.add-songs-count {
+  font-size: 12px;
+  color: var(--text-faint);
+}

@@ -1,0 +1,185 @@
+.now-playing {
+  height: var(--transport-h);
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: 1fr minmax(360px, 1.6fr) 1fr;
+  align-items: center;
+  gap: 16px;
+  padding: 0 20px;
+  background: var(--bg-elev);
+  border-top: 1px solid var(--border);
+}
+
+/* Left: track info */
+.np-track {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.np-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.np-title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.np-artist {
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Center: transport */
+.np-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+}
+.np-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.np-btn {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--text-dim);
+  transition:
+    color 0.15s var(--ease),
+    background 0.15s var(--ease),
+    transform 0.1s var(--ease);
+}
+.np-btn:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+.np-btn:active {
+  transform: scale(0.92);
+}
+.np-btn.active {
+  color: var(--accent-2);
+}
+/* Spin flourish each time shuffle is switched on. */
+@keyframes shuffle-pop {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(200deg) scale(1.22);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+.np-shuffle.active svg {
+  animation: shuffle-pop 0.5s var(--ease);
+}
+.np-play {
+  width: 40px;
+  height: 40px;
+  background: var(--text);
+  color: var(--bg);
+}
+.np-play:hover {
+  background: #fff;
+  color: var(--bg);
+}
+.np-play:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.np-seek {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+.np-time {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  width: 38px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* Right: volume */
+.np-volume {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  color: var(--text-dim);
+}
+.np-vol-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: var(--text-dim);
+  transition:
+    color 0.12s var(--ease),
+    background 0.12s var(--ease);
+}
+.np-vol-icon:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+.np-vol-range {
+  width: 96px;
+  flex-shrink: 0;
+}
+
+/* Range inputs (seek + volume) with progress fill */
+.np-range {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1;
+  height: 4px;
+  border-radius: 4px;
+  background: linear-gradient(
+    to right,
+    var(--accent) var(--pct, 0%),
+    var(--bg-hover) var(--pct, 0%)
+  );
+  cursor: pointer;
+  outline: none;
+}
+.np-range:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+.np-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  opacity: 0;
+  transition: opacity 0.12s var(--ease);
+}
+.np-range:hover::-webkit-slider-thumb {
+  opacity: 1;
+}
+.np-vol-range {
+  background: linear-gradient(
+    to right,
+    var(--text-dim) var(--pct, 0%),
+    var(--bg-hover) var(--pct, 0%)
+  );
+}

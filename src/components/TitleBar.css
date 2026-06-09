@@ -1,0 +1,58 @@
+.title-bar {
+  height: 34px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  z-index: 20;
+  user-select: none;
+}
+
+.title-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 14px;
+  height: 100%;
+  flex: 1;
+  min-width: 0;
+}
+.title-bar-mark {
+  font-size: 13px;
+  line-height: 1;
+  pointer-events: none;
+}
+.title-bar-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  letter-spacing: 0.01em;
+  pointer-events: none;
+}
+
+.title-bar-controls {
+  display: flex;
+  height: 100%;
+  flex-shrink: 0;
+}
+.tb-btn {
+  width: 46px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--text-dim);
+  transition:
+    background 0.12s var(--ease),
+    color 0.12s var(--ease);
+}
+.tb-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.tb-close:hover {
+  background: #e81123;
+  color: #fff;
+}

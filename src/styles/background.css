@@ -1,0 +1,53 @@
+/* Full-window background image (auto-covers any window size). */
+.app-bg {
+  position: fixed;
+  inset: -40px; /* overscan hides blur edges */
+  background-size: cover;
+  background-position: center;
+  z-index: -2;
+  pointer-events: none;
+}
+.app-bg-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 9, 12, 0.42);
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* When a background is active, the shell goes glassy so it shows through. */
+.app-shell.has-bg {
+  position: relative;
+  z-index: 0;
+  background: transparent;
+}
+/* Chrome (sidebar / title bar / transport / queue) — frosted, holds small text */
+.app-shell.has-bg .title-bar,
+.app-shell.has-bg .sidebar,
+.app-shell.has-bg .now-playing,
+.app-shell.has-bg .queue-panel {
+  background: rgba(24, 27, 37, 0.46);
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+}
+.app-shell.has-bg .app-main {
+  background: transparent;
+}
+
+/* Content surfaces — brighter "liquid glass" */
+.app-shell.has-bg .setting-row,
+.app-shell.has-bg .search-bar,
+.app-shell.has-bg .playlist-card,
+.app-shell.has-bg .format-toggle,
+.app-shell.has-bg .song-row {
+  background: rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.12);
+}
+.app-shell.has-bg .result-row:hover,
+.app-shell.has-bg .song-row:hover,
+.app-shell.has-bg .queue-row:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
