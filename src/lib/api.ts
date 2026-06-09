@@ -17,7 +17,25 @@ export const api = {
     invoke<string>("import_background", { srcPath, name }),
   defaultLibraryDir: () => invoke<string>("default_library_dir"),
   updateYtdlp: () => invoke<string>("update_ytdlp"),
+  toolsStatus: () => invoke<ToolsStatus>("tools_status"),
+  installFfmpeg: () => invoke<string>("install_ffmpeg"),
 };
+
+export interface ToolsStatus {
+  ffmpegInstalled: boolean;
+  ffmpegPath: string | null;
+}
+
+export interface SetupProgress {
+  step: "downloading" | "extracting" | "done";
+  percent: number;
+}
+
+export function onSetupProgress(
+  cb: (p: SetupProgress) => void,
+): Promise<UnlistenFn> {
+  return listen<SetupProgress>("setup-progress", (e) => cb(e.payload));
+}
 
 export interface DownloadProgress {
   videoId: string;

@@ -1,6 +1,6 @@
 # Local Music Player
 
-A Windows desktop music player built with **Tauri 2 + React + TypeScript**. Search YouTube, stream a song instantly, or download it into always-offline playlists — powered by a bundled `yt-dlp` + `ffmpeg`, no Python or system installs needed.
+A Windows desktop music player built with **Tauri 2 + React + TypeScript**. Search YouTube, stream a song instantly, or download it into always-offline playlists — powered by a bundled `yt-dlp` (standalone, embeds its own Python) plus `ffmpeg`, no system installs needed.
 
 ## Features
 
@@ -41,11 +41,30 @@ npm run setup -- -Force # re-download (e.g. to update ffmpeg)
 npm run tauri build
 ```
 
-Installers land in `src-tauri/target/release/bundle/`.
+The NSIS installer (`Local Music Player_x.y.z_x64-setup.exe`) lands in
+`src-tauri/target/release/bundle/nsis/`. It bundles yt-dlp but **not** ffmpeg —
+the app shows a one-time setup screen on first launch that downloads ffmpeg
+(~90 MB) into the user's app-data `tools` folder. That keeps the installer
+small (~25 MB) and needs no admin rights.
+
+### Publishing via GitHub Actions
+
+Pushing a version tag builds the installer on CI and attaches it to a GitHub
+Release automatically (`.github/workflows/release.yml`):
+
+```powershell
+# bump "version" in src-tauri/tauri.conf.json + package.json first
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+A manual run from the Actions tab builds the installer as a downloadable
+workflow artifact without creating a release.
 
 ## Tool layout
 
 | File | Why it's there |
 | --- | --- |
-| `src-tauri/binaries/yt-dlp-x86_64-pc-windows-msvc.exe` | Tauri sidecar (`externalBin`); the target-triple suffix is required |
-| `src-tauri/resources/ffmpeg.exe`, `ffprobe.exe` | Bundled resources; passed to yt-dlp via `--ffmpeg-location` for audio extraction/conversion |
+| `src-tauri/binaries/yt-dlp-x86_64-pc-windows-msvc.exe` | Tauri sidecar (`externalBin`), bundled into the installer; the target-triple suffix is required |
+| `src-tauri/resources/ffmpeg.exe`, `ffprobe.exe` | Dev-only fallback; passed to yt-dlp via `--ffmpeg-location` for audio extraction/conversion |
+| `%APPDATA%/com.localmusicplayer.app/tools/ffmpeg.exe`, `ffprobe.exe` | Installed by the first-run setup screen in packaged builds (checked first) |

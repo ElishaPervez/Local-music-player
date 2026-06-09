@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Minus, Square, Copy, X } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import appIcon from "../assets/icon.svg";
 import "./TitleBar.css";
 
 const appWindow = getCurrentWindow();
@@ -24,7 +25,14 @@ export default function TitleBar() {
   return (
     <div className="title-bar" data-tauri-drag-region>
       <div className="title-bar-left" data-tauri-drag-region>
-        <span className="title-bar-mark">🎵</span>
+        <img
+          className="title-bar-mark"
+          src={appIcon}
+          alt=""
+          width={18}
+          height={18}
+          draggable={false}
+        />
         <span className="title-bar-title">Local Music Player</span>
       </div>
       <div className="title-bar-controls">

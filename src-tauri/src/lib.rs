@@ -1,4 +1,5 @@
 mod commands;
+mod setup;
 mod ytdlp;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -17,6 +18,8 @@ pub fn run() {
             commands::default_library_dir,
             commands::delete_file,
             commands::import_background,
+            setup::tools_status,
+            setup::install_ffmpeg,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -7,10 +7,11 @@ import {
   FolderOpen,
   Image as ImageIcon,
   Blend,
+  Wrench,
 } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
-import { api, fileSrc } from "../lib/api";
+import { api, fileSrc, type ToolsStatus } from "../lib/api";
 import { useLibraryStore } from "../stores/libraryStore";
 import type { AudioFormat } from "../lib/types";
 import BackgroundModal from "../components/BackgroundModal";
@@ -35,13 +36,34 @@ export default function SettingsView() {
   );
   const [bgBusy, setBgBusy] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
+  const [tools, setTools] = useState<ToolsStatus | null>(null);
+  const [ffmpegBusy, setFfmpegBusy] = useState(false);
+  const [ffmpegMsg, setFfmpegMsg] = useState("");
 
   useEffect(() => {
     api
       .ytdlpVersion()
       .then(setVersion)
       .catch(() => setVersion("unknown"));
+    api
+      .toolsStatus()
+      .then(setTools)
+      .catch(() => {});
   }, []);
+
+  async function reinstallFfmpeg() {
+    setFfmpegBusy(true);
+    setFfmpegMsg("");
+    try {
+      await api.installFfmpeg();
+      setTools(await api.toolsStatus());
+      setFfmpegMsg("Installed.");
+    } catch (e) {
+      setFfmpegMsg(String(e));
+    } finally {
+      setFfmpegBusy(false);
+    }
+  }
 
   async function changeFolder() {
     const picked = await open({
@@ -235,6 +257,45 @@ export default function SettingsView() {
               disabled={updating}
             >
               {updating ? "Updating…" : "Update"}
+            </button>
+          </div>
+
+          <div className="setting-row">
+            <div className="setting-info">
+              <Wrench size={18} />
+              <div>
+                <strong>FFmpeg</strong>
+                <p>
+                  {tools === null
+                    ? "Checking…"
+                    : tools.ffmpegInstalled
+                      ? "Installed"
+                      : "Not installed — downloads need it"}
+                  {tools?.ffmpegPath && (
+                    <>
+                      {" — "}
+                      <span className="mono">{tools.ffmpegPath}</span>
+                    </>
+                  )}
+                  {ffmpegMsg && (
+                    <>
+                      {" — "}
+                      <span className="update-msg">{ffmpegMsg}</span>
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+            <button
+              className="btn-secondary"
+              onClick={() => void reinstallFfmpeg()}
+              disabled={ffmpegBusy}
+            >
+              {ffmpegBusy
+                ? "Installing…"
+                : tools?.ffmpegInstalled
+                  ? "Reinstall"
+                  : "Install"}
             </button>
           </div>
 

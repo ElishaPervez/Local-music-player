@@ -1,6 +1,7 @@
+use crate::setup::ffmpeg_location;
 use serde::Serialize;
 use std::path::PathBuf;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 use tauri_plugin_shell::process::CommandEvent;
 use tauri_plugin_shell::ShellExt;
 
@@ -179,27 +180,6 @@ pub async fn resolve_stream(app: AppHandle, url: String) -> Result<String, Strin
     } else {
         Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
     }
-}
-
-/// Directory containing the bundled ffmpeg/ffprobe, for yt-dlp's --ffmpeg-location.
-fn ffmpeg_location(app: &AppHandle) -> Option<PathBuf> {
-    if let Ok(res) = app.path().resource_dir() {
-        let nested = res.join("resources");
-        if nested.join("ffmpeg.exe").exists() {
-            return Some(nested);
-        }
-        if res.join("ffmpeg.exe").exists() {
-            return Some(res);
-        }
-    }
-    #[cfg(debug_assertions)]
-    {
-        let dev = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources");
-        if dev.join("ffmpeg.exe").exists() {
-            return Some(dev);
-        }
-    }
-    None
 }
 
 /// Download a track's audio into the library folder, emitting progress events.

@@ -21,8 +21,8 @@
   min-width: 0;
 }
 .title-bar-mark {
-  font-size: 13px;
-  line-height: 1;
+  display: block;
+  border-radius: 4px;
   pointer-events: none;
 }
 .title-bar-title {

@@ -1,11 +1,14 @@
 # Downloads the external tools the app drives, into the paths Tauri expects:
 #   src-tauri/binaries/yt-dlp-x86_64-pc-windows-msvc.exe   (sidecar; the
 #       target-triple suffix is required by Tauri's externalBin)
-#   src-tauri/resources/ffmpeg.exe + ffprobe.exe            (bundled resources)
+#   src-tauri/resources/ffmpeg.exe + ffprobe.exe            (dev-only fallback;
+#       installed builds download ffmpeg on first run instead)
 #
 # These are large (ffmpeg alone is bigger than GitHub's file limit), so they
 # are gitignored and fetched here instead. Safe to re-run: existing files are
 # skipped. Use -Force to re-download everything (e.g. to update ffmpeg).
+# Set LMP_SKIP_FFMPEG=1 to skip the ffmpeg download (CI release builds don't
+# bundle it — the app installs it on first run).
 
 param([switch]$Force)
 
@@ -31,7 +34,9 @@ if ($Force -or -not (Test-Path $ytDlp)) {
 
 $ffmpeg = Join-Path $resDir "ffmpeg.exe"
 $ffprobe = Join-Path $resDir "ffprobe.exe"
-if ($Force -or -not (Test-Path $ffmpeg) -or -not (Test-Path $ffprobe)) {
+if ($env:LMP_SKIP_FFMPEG -eq "1") {
+    Write-Host "LMP_SKIP_FFMPEG=1 - skipping ffmpeg (first-run setup installs it)."
+} elseif ($Force -or -not (Test-Path $ffmpeg) -or -not (Test-Path $ffprobe)) {
     Write-Host "Downloading ffmpeg essentials build (~90 MB, one-time)..."
     $zip = Join-Path $env:TEMP "lmp-ffmpeg.zip"
     $extract = Join-Path $env:TEMP "lmp-ffmpeg"
