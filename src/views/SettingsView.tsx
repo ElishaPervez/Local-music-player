@@ -14,6 +14,7 @@ import { api, fileSrc } from "../lib/api";
 import { useLibraryStore } from "../stores/libraryStore";
 import type { AudioFormat } from "../lib/types";
 import BackgroundModal from "../components/BackgroundModal";
+import LibraryPanel from "./settings/LibraryPanel";
 import "./views.css";
 import "./SettingsView.css";
 
@@ -33,6 +34,7 @@ export default function SettingsView() {
     null,
   );
   const [bgBusy, setBgBusy] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
 
   useEffect(() => {
     api
@@ -236,18 +238,27 @@ export default function SettingsView() {
             </button>
           </div>
 
-          <div className="setting-row">
-            <div className="setting-info">
-              <Library size={18} />
-              <div>
-                <strong>Library</strong>
-                <p>
-                  {songCount} {songCount === 1 ? "song" : "songs"} ·{" "}
-                  {playlistCount}{" "}
-                  {playlistCount === 1 ? "playlist" : "playlists"}
-                </p>
+          <div className="setting-row expandable">
+            <div className="setting-row-main">
+              <div className="setting-info">
+                <Library size={18} />
+                <div>
+                  <strong>Library</strong>
+                  <p>
+                    {songCount} {songCount === 1 ? "song" : "songs"} ·{" "}
+                    {playlistCount}{" "}
+                    {playlistCount === 1 ? "playlist" : "playlists"}
+                  </p>
+                </div>
               </div>
+              <button
+                className="btn-secondary"
+                onClick={() => setManageOpen((v) => !v)}
+              >
+                {manageOpen ? "Hide" : "Manage…"}
+              </button>
             </div>
+            {manageOpen && <LibraryPanel />}
           </div>
         </div>
       </div>

@@ -3,7 +3,6 @@ import {
   GripVertical,
   Play,
   MoreHorizontal,
-  Trash2,
   Pencil,
   FolderOpen,
   ListPlus,
@@ -36,7 +35,6 @@ export default function SongRow({
   const playlists = useLibraryStore((s) => s.playlists);
   const addToPlaylist = useLibraryStore((s) => s.addToPlaylist);
   const removeFromPlaylist = useLibraryStore((s) => s.removeFromPlaylist);
-  const deleteSong = useLibraryStore((s) => s.deleteSong);
   const updateSong = useLibraryStore((s) => s.updateSong);
   const addToQueue = usePlayerStore((s) => s.addToQueue);
 
@@ -56,17 +54,6 @@ export default function SongRow({
     if (t && t !== song.title) updateSong(song.id, { title: t });
     else setTitle(song.title);
     setEditing(false);
-  }
-
-  function confirmDelete() {
-    setMenuOpen(false);
-    if (
-      window.confirm(
-        `Delete "${song.title}" from your library? This removes the file and all playlist entries.`,
-      )
-    ) {
-      void deleteSong(song.id);
-    }
   }
 
   return (
@@ -166,10 +153,6 @@ export default function SongRow({
               >
                 <FolderOpen size={15} /> Reveal in folder
               </button>
-              <button className="row-menu-item danger" onClick={confirmDelete}>
-                <Trash2 size={15} /> Delete from library
-              </button>
-
               {playlists.filter((p) => p.id !== playlistId).length > 0 && (
                 <div className="row-menu-section">
                   <span className="row-menu-label">Add to playlist</span>
