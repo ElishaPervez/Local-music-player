@@ -2,12 +2,23 @@ use futures_util::StreamExt;
 use serde::Serialize;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 
-/// Pinned source for the first-run ffmpeg install. The "essentials" build is
-/// the smallest official static build that still has every codec yt-dlp's
-/// audio extraction needs.
-const FFMPEG_URL: &str = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip";
+/// Sources for the first-run ffmpeg install, tried in order. The "essentials"
+/// build is the smallest official static build that still has every codec
+/// yt-dlp's audio extraction needs. gyan.dev is a single-origin server that is
+/// slow or unreachable from some networks, so two GitHub-CDN mirrors back it
+/// up: GyanD/codexffmpeg republishes the identical essentials build, and BtbN
+/// is an independent build (bigger, GPL) whose zip nests the exes under the
+/// same `*/bin/` layout the extractor expects.
+const FFMPEG_SOURCES: &[&str] = &[
+    "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
+    "https://github.com/GyanD/codexffmpeg/releases/download/8.1.1/ffmpeg-8.1.1-essentials_build.zip",
+    "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-gpl.zip",
+];
+
+const DOWNLOAD_ATTEMPTS_PER_SOURCE: u32 = 3;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -81,51 +92,151 @@ fn emit_progress(app: &AppHandle, step: &str, percent: f64) {
 
 /// Download the ffmpeg essentials build and install ffmpeg.exe + ffprobe.exe
 /// into the per-user tools dir, emitting `setup-progress` events along the way.
+/// Tries each source with per-source retries (resuming partial downloads), and
+/// falls through to the next mirror if a source can't be downloaded or its
+/// archive is unusable.
 #[tauri::command]
 pub async fn install_ffmpeg(app: AppHandle) -> Result<String, String> {
     let tools = tools_dir(&app)?;
     std::fs::create_dir_all(&tools).map_err(|e| e.to_string())?;
     let zip_path = tools.join("ffmpeg-download.zip");
 
-    emit_progress(&app, "downloading", 0.0);
-    let resp = reqwest::get(FFMPEG_URL)
-        .await
-        .map_err(|e| format!("Download failed: {e}"))?;
-    if !resp.status().is_success() {
-        return Err(format!("Download failed: HTTP {}", resp.status()));
-    }
-    let total = resp.content_length().unwrap_or(0);
+    let client = reqwest::Client::builder()
+        .connect_timeout(Duration::from_secs(20))
+        .read_timeout(Duration::from_secs(30))
+        .user_agent("local-music-player-setup")
+        .build()
+        .map_err(|e| e.to_string())?;
 
-    let mut file = std::fs::File::create(&zip_path).map_err(|e| e.to_string())?;
+    let mut errors: Vec<String> = Vec::new();
+    for url in FFMPEG_SOURCES {
+        // Partial files never carry over between mirrors — different archives.
+        let _ = std::fs::remove_file(&zip_path);
+        emit_progress(&app, "downloading", 0.0);
+        if let Err(e) = download_with_retries(&app, &client, url, &zip_path).await {
+            errors.push(format!("{}: {e}", source_host(url)));
+            continue;
+        }
+
+        emit_progress(&app, "extracting", 0.0);
+        let dest = tools.clone();
+        let zip2 = zip_path.clone();
+        let extracted =
+            tauri::async_runtime::spawn_blocking(move || extract_ffmpeg(&zip2, &dest))
+                .await
+                .map_err(|e| e.to_string())?;
+        let _ = std::fs::remove_file(&zip_path);
+        match extracted {
+            Ok(()) => {
+                emit_progress(&app, "done", 100.0);
+                return Ok(tools.to_string_lossy().to_string());
+            }
+            Err(e) => errors.push(format!("{}: {e}", source_host(url))),
+        }
+    }
+
+    let _ = std::fs::remove_file(&zip_path);
+    Err(format!(
+        "Couldn't download FFmpeg — check your internet connection (or firewall/antivirus) and try again. Details: {}",
+        errors.join(" • ")
+    ))
+}
+
+/// Short label for error messages, e.g. "www.gyan.dev" or "github.com".
+fn source_host(url: &str) -> &str {
+    url.split('/').nth(2).unwrap_or(url)
+}
+
+async fn download_with_retries(
+    app: &AppHandle,
+    client: &reqwest::Client,
+    url: &str,
+    zip_path: &Path,
+) -> Result<(), String> {
+    let mut last_err = String::new();
+    for attempt in 1..=DOWNLOAD_ATTEMPTS_PER_SOURCE {
+        if attempt > 1 {
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        }
+        match download_once(app, client, url, zip_path).await {
+            Ok(()) => return Ok(()),
+            Err(e) => last_err = e,
+        }
+    }
+    Err(last_err)
+}
+
+/// One download attempt. If a partial file exists from a previous attempt,
+/// asks the server to resume from where it left off instead of starting over.
+async fn download_once(
+    app: &AppHandle,
+    client: &reqwest::Client,
+    url: &str,
+    zip_path: &Path,
+) -> Result<(), String> {
+    let have = std::fs::metadata(zip_path).map(|m| m.len()).unwrap_or(0);
+    let mut req = client.get(url);
+    if have > 0 {
+        req = req.header(reqwest::header::RANGE, format!("bytes={have}-"));
+    }
+    let resp = req.send().await.map_err(describe_reqwest_err)?;
+    let status = resp.status();
+
+    let (mut file, mut got, total) = if status == reqwest::StatusCode::PARTIAL_CONTENT && have > 0 {
+        let total = have + resp.content_length().unwrap_or(0);
+        let file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(zip_path)
+            .map_err(|e| e.to_string())?;
+        (file, have, total)
+    } else if status.is_success() {
+        // Fresh download, or the server ignored our Range header: start over.
+        let total = resp.content_length().unwrap_or(0);
+        let file = std::fs::File::create(zip_path).map_err(|e| e.to_string())?;
+        (file, 0u64, total)
+    } else {
+        if status == reqwest::StatusCode::RANGE_NOT_SATISFIABLE {
+            // Stale/over-long partial file; clear it so the retry starts fresh.
+            let _ = std::fs::remove_file(zip_path);
+        }
+        return Err(format!("HTTP {status}"));
+    };
+
     let mut stream = resp.bytes_stream();
-    let mut got: u64 = 0;
-    let mut last_emit = 0.0_f64;
+    let mut last_emit = -1.0_f64;
     while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|e| format!("Download failed: {e}"))?;
+        let chunk = chunk.map_err(describe_reqwest_err)?;
         file.write_all(&chunk).map_err(|e| e.to_string())?;
         got += chunk.len() as u64;
         if total > 0 {
             let pct = (got as f64 / total as f64) * 100.0;
             if pct - last_emit >= 1.0 {
                 last_emit = pct;
-                emit_progress(&app, "downloading", pct);
+                emit_progress(app, "downloading", pct);
             }
         }
     }
-    drop(file);
 
-    emit_progress(&app, "extracting", 0.0);
-    let dest = tools.clone();
-    let zip2 = zip_path.clone();
-    let extracted =
-        tauri::async_runtime::spawn_blocking(move || extract_ffmpeg(&zip2, &dest))
-            .await
-            .map_err(|e| e.to_string())?;
-    let _ = std::fs::remove_file(&zip_path);
-    extracted?;
+    if total > 0 && got < total {
+        return Err(format!("connection dropped at {got} of {total} bytes"));
+    }
+    Ok(())
+}
 
-    emit_progress(&app, "done", 100.0);
-    Ok(tools.to_string_lossy().to_string())
+/// reqwest's Display is vague ("error decoding response body"); append the
+/// underlying cause chain so users see e.g. "connection reset by peer".
+fn describe_reqwest_err(e: reqwest::Error) -> String {
+    let mut msg = e.to_string();
+    let mut src = std::error::Error::source(&e);
+    while let Some(cause) = src {
+        let cause_str = cause.to_string();
+        if !msg.contains(&cause_str) {
+            msg.push_str(": ");
+            msg.push_str(&cause_str);
+        }
+        src = cause.source();
+    }
+    msg
 }
 
 /// Pull just ffmpeg.exe and ffprobe.exe out of the release zip (which nests
