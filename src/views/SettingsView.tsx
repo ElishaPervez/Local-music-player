@@ -8,6 +8,7 @@ import {
   Image as ImageIcon,
   Blend,
   Wrench,
+  Radio,
 } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
@@ -189,6 +190,30 @@ export default function SettingsView() {
               className={`switch ${settings.crossfade ? "on" : ""}`}
               onClick={() => setSettings({ crossfade: !settings.crossfade })}
               title="Toggle crossfade"
+            >
+              <span className="switch-knob" />
+            </button>
+          </div>
+
+          <div className="setting-row">
+            <div className="setting-info">
+              <Radio size={18} />
+              <div>
+                <strong>Discord presence</strong>
+                <p>
+                  Show the song you're playing on your Discord profile (needs the
+                  desktop Discord app running)
+                </p>
+              </div>
+            </div>
+            <button
+              role="switch"
+              aria-checked={settings.discordPresence}
+              className={`switch ${settings.discordPresence ? "on" : ""}`}
+              onClick={() =>
+                setSettings({ discordPresence: !settings.discordPresence })
+              }
+              title="Toggle Discord presence"
             >
               <span className="switch-knob" />
             </button>

@@ -28,3 +28,7 @@ dist-ssr
 src-tauri/binaries/
 src-tauri/resources/ffmpeg.exe
 src-tauri/resources/ffprobe.exe
+
+# Local-only duplicate of app-icon.png, named for the Discord "app_icon"
+# Rich Presence art-asset upload (see README → Discord Rich Presence).
+/app_icon.png

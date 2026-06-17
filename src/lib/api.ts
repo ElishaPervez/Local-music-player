@@ -19,7 +19,23 @@ export const api = {
   updateYtdlp: () => invoke<string>("update_ytdlp"),
   toolsStatus: () => invoke<ToolsStatus>("tools_status"),
   installFfmpeg: () => invoke<string>("install_ffmpeg"),
+  discordSetPresence: (presence: DiscordPresence) =>
+    invoke<void>("discord_set_presence", { presence }),
+  discordClear: () => invoke<void>("discord_clear"),
+  discordDisconnect: () => invoke<void>("discord_disconnect"),
 };
+
+/** Playback snapshot sent to the Rust Discord Rich Presence bridge. */
+export interface DiscordPresence {
+  title: string;
+  artist: string;
+  durationSec: number;
+  positionSec: number;
+  isPlaying: boolean;
+  repeat: string;
+  shuffle: boolean;
+  playlistName: string | null;
+}
 
 export interface ToolsStatus {
   ffmpegInstalled: boolean;

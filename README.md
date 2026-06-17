@@ -8,6 +8,7 @@ A Windows desktop music player built with **Tauri 2 + React + TypeScript**. Sear
 - **Playlists** — fully offline; one global song library, playlists are ordered references (same song in many lists, removing ≠ deleting), drag to reorder
 - **Queue** — live "Playing playlist" panel (drag rows to reorder from anywhere, resizable width), Spotify-style fixed-order shuffle, repeat one/all
 - **Player** — crossfade ("fade to next song"), seek/volume, animated transport bar
+- **Discord presence** — show the song you're playing on your Discord profile, with a live progress bar and loop/shuffle state (toggle in Settings; see setup below)
 - **Looks** — custom background image with blur/opacity, collapsible sidebar, frameless window
 
 ## Requirements
@@ -60,6 +61,28 @@ git push origin v0.1.0
 
 A manual run from the Actions tab builds the installer as a downloadable
 workflow artifact without creating a release.
+
+## Discord Rich Presence
+
+When the desktop Discord app is running, the player can show your current track
+on your profile ("Listening to Local Music Player" → song title → `by Artist ·
+🔁 Looping`, plus a live elapsed/remaining progress bar). Toggle it under
+**Settings → Discord presence**.
+
+It needs a one-time setup with your own free Discord application (the app ID is
+public and safe to ship, but it's tied to *your* Discord account, so it can't be
+committed for you):
+
+1. Open the [Discord Developer Portal](https://discord.com/developers/applications)
+   → **New Application**, name it **Local Music Player** (this is the name shown
+   after "Listening to …").
+2. Copy its **Application ID** into `DISCORD_APP_ID` in
+   [`src-tauri/src/discord.rs`](src-tauri/src/discord.rs).
+3. *(Optional, for the app icon)* **Rich Presence → Art Assets** → upload a
+   square image named exactly `app_icon`. You can also add optional status
+   badges named `play`, `pause`, `repeat`, `repeat_one`, `shuffle`; if any are
+   missing Discord simply omits the small corner icon.
+4. Rebuild. Until a real ID is set, presence quietly no-ops.
 
 ## Tool layout
 

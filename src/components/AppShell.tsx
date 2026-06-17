@@ -3,6 +3,7 @@ import { useUIStore } from "../stores/uiStore";
 import { useLibraryStore } from "../stores/libraryStore";
 import { initPlayer } from "../stores/playerStore";
 import { initDownloads } from "../lib/downloadService";
+import { initDiscordPresence } from "../lib/discordPresence";
 import Sidebar from "./Sidebar";
 import TitleBar from "./TitleBar";
 import ResizeHandles from "./ResizeHandles";
@@ -20,6 +21,7 @@ export default function AppShell() {
   useEffect(() => {
     initPlayer();
     initDownloads();
+    initDiscordPresence();
     void useLibraryStore.getState().load();
   }, []);
 

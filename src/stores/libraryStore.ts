@@ -32,6 +32,7 @@ const DEFAULT_SETTINGS: Settings = {
   audioFormat: "m4a",
   background: null,
   crossfade: false,
+  discordPresence: true,
 };
 
 export const useLibraryStore = create<LibraryState>((set, get) => {

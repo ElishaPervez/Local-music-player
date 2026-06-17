@@ -41,6 +41,8 @@ export interface Settings {
   background: BackgroundConfig | null;
   /** Fade the last seconds of each track into the next. */
   crossfade: boolean;
+  /** Broadcast the currently-playing song to Discord (Rich Presence). */
+  discordPresence: boolean;
 }
 
 export type PlaybackSource =

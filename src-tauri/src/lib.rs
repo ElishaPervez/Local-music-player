@@ -1,4 +1,5 @@
 mod commands;
+mod discord;
 mod setup;
 mod ytdlp;
 
@@ -9,6 +10,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
+        .manage(discord::DiscordState::default())
         .invoke_handler(tauri::generate_handler![
             ytdlp::ytdlp_version,
             ytdlp::search,
@@ -20,6 +22,9 @@ pub fn run() {
             commands::import_background,
             setup::tools_status,
             setup::install_ffmpeg,
+            discord::discord_set_presence,
+            discord::discord_clear,
+            discord::discord_disconnect,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
