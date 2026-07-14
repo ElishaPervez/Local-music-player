@@ -43,6 +43,8 @@ export interface Settings {
   crossfade: boolean;
   /** Broadcast the currently-playing song to Discord (Rich Presence). */
   discordPresence: boolean;
+  /** Auto-append similar (streamed) songs to keep the queue going. */
+  autoPlay: boolean;
 }
 
 export type PlaybackSource =
@@ -59,6 +61,8 @@ export interface PlaybackItem {
   durationSec: number;
   thumbnail?: string | null;
   source: PlaybackSource;
+  /** True for tracks the auto-player streamed in to keep the queue going. */
+  auto?: boolean;
 }
 
 export type RepeatMode = "off" | "all" | "one";

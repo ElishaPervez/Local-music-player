@@ -14,6 +14,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             ytdlp::ytdlp_version,
             ytdlp::search,
+            ytdlp::related_mix,
             ytdlp::resolve_stream,
             ytdlp::download_song,
             ytdlp::update_ytdlp,

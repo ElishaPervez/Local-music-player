@@ -28,7 +28,7 @@ export function songToItem(song: Song): PlaybackItem {
 }
 
 /** A search result played directly → an ephemeral stream item (resolved lazily). */
-export function resultToStreamItem(r: SearchResult): PlaybackItem {
+export function resultToStreamItem(r: SearchResult, auto = false): PlaybackItem {
   return {
     key: uniq(`t${r.videoId}`),
     videoId: r.videoId,
@@ -37,5 +37,6 @@ export function resultToStreamItem(r: SearchResult): PlaybackItem {
     durationSec: r.durationSec,
     thumbnail: r.thumbnail,
     source: { kind: "stream", videoId: r.videoId, url: "" },
+    auto,
   };
 }

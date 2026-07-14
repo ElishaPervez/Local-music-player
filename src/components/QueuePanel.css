@@ -52,12 +52,86 @@
   color: var(--text-dim);
 }
 .queue-badge {
-  margin-left: auto;
   font-size: 11px;
   background: var(--bg-hover);
   color: var(--text-dim);
   padding: 2px 8px;
   border-radius: 10px;
+}
+
+/* Header action buttons (Save / Clear), pushed as a group — with the count
+   badge after them — to the right edge of the header. */
+.queue-head-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.queue-head-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--text-dim);
+  background: var(--bg-hover);
+  padding: 4px 10px;
+  border-radius: 9px;
+  transition:
+    color 0.12s var(--ease),
+    background 0.12s var(--ease);
+}
+.queue-head-btn:hover:not(:disabled) {
+  color: var(--accent-2);
+  background: var(--accent-soft);
+}
+.queue-head-btn.danger:hover:not(:disabled) {
+  color: var(--danger, #ef5f6b);
+  background: rgba(239, 95, 107, 0.12);
+}
+.queue-head-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.queue-save-row {
+  padding: 8px 12px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.queue-save-row input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 13px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-hover);
+  border: 1px solid var(--border-soft);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.12s var(--ease);
+}
+.queue-save-row input:focus {
+  border-color: var(--accent);
+}
+
+/* Per-row download state shown while saving the queue into a playlist; sits
+   where the remove button normally is. */
+.queue-dl {
+  min-width: 30px;
+  height: 26px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-2);
+}
+.queue-dl.error {
+  color: var(--danger, #ef5f6b);
 }
 
 .queue-empty {
@@ -191,6 +265,22 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Marks a track the auto-player streamed in (vs. one the user queued). */
+.queue-auto-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-right: 6px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--accent-2);
+  background: var(--accent-soft);
+  padding: 1px 5px;
+  border-radius: 7px;
+  vertical-align: middle;
 }
 
 .queue-remove {

@@ -19,7 +19,8 @@
 //!   4. Rebuild the app. Until a real ID is set, all presence calls no-op.
 //! ──────────────────────────────────────────────────────────────────────────
 
-use std::sync::Mutex;
+use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
+use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use discord_rich_presence::{
@@ -56,7 +57,8 @@ pub struct Presence {
     playlist_name: Option<String>,
 }
 
-/// The live IPC client plus the last time we tried to (re)connect.
+/// The live IPC client plus the last time we tried to (re)connect. Owned solely
+/// by the background worker thread, so no lock is needed to touch it.
 #[derive(Default)]
 struct DiscordConn {
     client: Option<DiscordIpcClient>,
@@ -66,6 +68,12 @@ struct DiscordConn {
 impl DiscordConn {
     /// Ensure there's a live connection, connecting (at most once per throttle
     /// window) if Discord has since come online.
+    ///
+    /// NOTE: `connect()` does a blocking, timeout-less handshake read on
+    /// Discord's IPC pipe (the crate exposes no timeout). That blocking now
+    /// happens ONLY on the dedicated worker thread below — never on a command
+    /// thread — so a slow or unresponsive Discord can at worst stall presence
+    /// updates, never the UI or any other Tauri command.
     fn ensure_connected(&mut self) -> Result<(), String> {
         if self.client.is_some() {
             return Ok(());
@@ -81,11 +89,97 @@ impl DiscordConn {
         self.client = Some(client);
         Ok(())
     }
+
+    /// Push a playback snapshot to Discord, reconnecting if needed.
+    fn apply(&mut self, p: &Presence) -> Result<(), String> {
+        if !is_configured() {
+            return Ok(());
+        }
+        self.ensure_connected()?;
+        let activity = build_activity(p);
+        if let Some(client) = self.client.as_mut() {
+            if let Err(e) = client.set_activity(activity) {
+                // Most likely Discord was closed mid-session; drop the dead
+                // client so the next update reconnects.
+                self.client = None;
+                return Err(e.to_string());
+            }
+        }
+        Ok(())
+    }
+
+    /// Remove the activity but keep the connection alive.
+    fn clear(&mut self) {
+        if !is_configured() {
+            return;
+        }
+        if let Some(client) = self.client.as_mut() {
+            let _ = client.clear_activity();
+        }
+    }
+
+    /// Clear the activity and fully close the IPC connection.
+    fn disconnect(&mut self) {
+        if let Some(mut client) = self.client.take() {
+            let _ = client.clear_activity();
+            let _ = client.close();
+        }
+        self.last_attempt = None;
+    }
 }
 
-/// Tauri-managed wrapper so the connection survives across command calls.
-#[derive(Default)]
-pub struct DiscordState(Mutex<DiscordConn>);
+/// A request handed to the Discord worker thread.
+enum Msg {
+    Set(Presence),
+    Clear,
+    Disconnect,
+}
+
+/// Run the IPC client on its own thread. All blocking pipe I/O lives here so it
+/// can never stall a Tauri command thread. Requests that pile up while a slow
+/// `connect()`/`set_activity()` is in flight are coalesced latest-wins, so a
+/// playlist firing one push per track can't build an unbounded backlog.
+fn worker(rx: Receiver<Msg>) {
+    let mut conn = DiscordConn::default();
+    while let Ok(mut msg) = rx.recv() {
+        // Drain everything already queued and keep only the most recent request
+        // — each presence push is a full snapshot, so older ones are obsolete.
+        loop {
+            match rx.try_recv() {
+                Ok(m) => msg = m,
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => break,
+            }
+        }
+        // Isolate each request: errors are swallowed (presence is best-effort)
+        // and an unexpected panic inside the IPC crate must not kill the worker
+        // for the rest of the session — we drop the (possibly half-broken)
+        // client so the next request reconnects cleanly.
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| match msg {
+            Msg::Set(p) => {
+                let _ = conn.apply(&p);
+            }
+            Msg::Clear => conn.clear(),
+            Msg::Disconnect => conn.disconnect(),
+        }));
+        if outcome.is_err() {
+            conn.client = None;
+            conn.last_attempt = None;
+        }
+    }
+}
+
+/// Tauri-managed handle to the worker thread. Commands only enqueue a request
+/// and return immediately, so they never block.
+pub struct DiscordState(Sender<Msg>);
+
+impl Default for DiscordState {
+    fn default() -> Self {
+        let (tx, rx) = mpsc::channel::<Msg>();
+        thread::spawn(move || worker(rx));
+        DiscordState(tx)
+    }
+}
 
 fn now_ms() -> i64 {
     SystemTime::now()
@@ -181,22 +275,12 @@ fn build_activity(p: &Presence) -> Activity<'static> {
 }
 
 /// Push the current playback state to Discord (no-op until configured).
+///
+/// Only enqueues the request; the actual (blocking) IPC happens on the worker
+/// thread, so this returns immediately and never blocks the caller.
 #[tauri::command]
 pub fn discord_set_presence(state: State<DiscordState>, presence: Presence) -> Result<(), String> {
-    if !is_configured() {
-        return Ok(());
-    }
-    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
-    conn.ensure_connected()?;
-    let activity = build_activity(&presence);
-    if let Some(client) = conn.client.as_mut() {
-        if let Err(e) = client.set_activity(activity) {
-            // Most likely Discord was closed mid-session; drop the dead client
-            // so the next update reconnects.
-            conn.client = None;
-            return Err(e.to_string());
-        }
-    }
+    let _ = state.0.send(Msg::Set(presence));
     Ok(())
 }
 
@@ -204,24 +288,13 @@ pub fn discord_set_presence(state: State<DiscordState>, presence: Presence) -> R
 /// playing, or the feature was toggled off).
 #[tauri::command]
 pub fn discord_clear(state: State<DiscordState>) -> Result<(), String> {
-    if !is_configured() {
-        return Ok(());
-    }
-    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
-    if let Some(client) = conn.client.as_mut() {
-        let _ = client.clear_activity();
-    }
+    let _ = state.0.send(Msg::Clear);
     Ok(())
 }
 
 /// Clear the activity and fully close the IPC connection.
 #[tauri::command]
 pub fn discord_disconnect(state: State<DiscordState>) -> Result<(), String> {
-    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
-    if let Some(mut client) = conn.client.take() {
-        let _ = client.clear_activity();
-        let _ = client.close();
-    }
-    conn.last_attempt = None;
+    let _ = state.0.send(Msg::Disconnect);
     Ok(())
 }

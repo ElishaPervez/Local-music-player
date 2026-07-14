@@ -5,6 +5,8 @@ import type { SearchResult, DownloadStatus } from "./types";
 export const api = {
   ytdlpVersion: () => invoke<string>("ytdlp_version"),
   search: (query: string) => invoke<SearchResult[]>("search", { query }),
+  relatedMix: (videoId: string, limit: number) =>
+    invoke<SearchResult[]>("related_mix", { videoId, limit }),
   resolveStream: (url: string) => invoke<string>("resolve_stream", { url }),
   downloadSong: (args: {
     url: string;

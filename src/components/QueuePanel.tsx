@@ -1,5 +1,15 @@
-import { useState } from "react";
-import { ListVideo, X, GripVertical, Volume2 } from "lucide-react";
+import { useRef, useState } from "react";
+import {
+  ListVideo,
+  X,
+  GripVertical,
+  Volume2,
+  Radio,
+  Save,
+  Check,
+  AlertCircle,
+  ListX,
+} from "lucide-react";
 import {
   DndContext,
   closestCenter,
@@ -17,8 +27,10 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import type { PlaybackItem } from "../lib/types";
 import { usePlayerStore } from "../stores/playerStore";
+import { useDownloadsStore } from "../stores/downloadsStore";
 import { useUIStore, QUEUE_W_DEFAULT } from "../stores/uiStore";
 import { useFlipReorder } from "../lib/useFlipReorder";
+import { saveQueueAsPlaylist } from "../lib/downloadService";
 import Thumb from "./Thumb";
 import "./QueuePanel.css";
 
@@ -33,6 +45,8 @@ function QueueRow({
 }) {
   const jumpTo = usePlayerStore((s) => s.jumpTo);
   const removeFromQueue = usePlayerStore((s) => s.removeFromQueue);
+  // Live download state while this track is being saved into a playlist.
+  const dl = useDownloadsStore((s) => s.byVideo[item.videoId]);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: item.key });
 
@@ -69,15 +83,44 @@ function QueueRow({
       )}
       <div className="queue-meta" onClick={() => jumpTo(index)}>
         <span className="queue-title">{item.title}</span>
-        <span className="queue-artist">{item.artist || "Unknown"}</span>
+        <span className="queue-artist">
+          {item.auto && item.source.kind === "stream" && (
+            <span className="queue-auto-badge" title="Auto-played radio pick">
+              <Radio size={11} />
+              Auto
+            </span>
+          )}
+          {item.artist || "Unknown"}
+        </span>
       </div>
-      <button
-        className="queue-remove"
-        onClick={() => removeFromQueue(item.key)}
-        title="Remove from queue"
-      >
-        <X size={15} />
-      </button>
+      {dl ? (
+        <span
+          className={`queue-dl ${dl.status}`}
+          title={
+            dl.status === "error"
+              ? "Download failed"
+              : dl.status === "done"
+                ? "Saved"
+                : `Downloading… ${Math.round(dl.percent)}%`
+          }
+        >
+          {dl.status === "downloading" ? (
+            `${Math.round(dl.percent)}%`
+          ) : dl.status === "done" ? (
+            <Check size={14} />
+          ) : (
+            <AlertCircle size={14} />
+          )}
+        </span>
+      ) : (
+        <button
+          className="queue-remove"
+          onClick={() => removeFromQueue(item.key)}
+          title="Remove from queue"
+        >
+          <X size={15} />
+        </button>
+      )}
     </div>
   );
 }
@@ -88,11 +131,41 @@ export default function QueuePanel() {
   const shuffle = usePlayerStore((s) => s.shuffle);
   const shuffleTick = usePlayerStore((s) => s.shuffleTick);
   const reorderQueue = usePlayerStore((s) => s.reorderQueue);
+  const clearQueue = usePlayerStore((s) => s.clearQueue);
   const queueWidth = useUIStore((s) => s.queueWidth);
   const setQueueWidth = useUIStore((s) => s.setQueueWidth);
   const [resizing, setResizing] = useState(false);
+  const [naming, setNaming] = useState(false);
+  const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+  // Pressing Enter unmounts the input, which also fires its blur — both call
+  // commitSave. This guard makes the save run exactly once per session so the
+  // queue isn't downloaded into two playlists.
+  const committing = useRef(false);
 
   const listRef = useFlipReorder<HTMLDivElement>(shuffleTick);
+
+  async function commitSave() {
+    if (committing.current) return;
+    const n = name.trim();
+    if (!n) {
+      setNaming(false);
+      setName("");
+      return;
+    }
+    committing.current = true;
+    setNaming(false);
+    setName("");
+    setSaving(true);
+    try {
+      // Downloads every queued track (in order) into a new playlist; streamed
+      // radio picks are fetched, already-downloaded songs are just referenced.
+      await saveQueueAsPlaylist(n);
+    } finally {
+      setSaving(false);
+      committing.current = false;
+    }
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -143,8 +216,49 @@ export default function QueuePanel() {
         <ListVideo size={16} />
         <span>Playing playlist</span>
         {shuffle && <span className="queue-shuffle-tag">Shuffled</span>}
-        {queue.length > 0 && <span className="queue-badge">{queue.length}</span>}
+        {queue.length > 0 && (
+          <div className="queue-head-actions">
+            <button
+              className="queue-head-btn"
+              onClick={() => setNaming(true)}
+              disabled={saving || naming}
+              title="Save the current queue as a downloaded playlist"
+            >
+              <Save size={13} />
+              {saving ? "Saving…" : "Save"}
+            </button>
+            <button
+              className="queue-head-btn danger"
+              onClick={() => clearQueue()}
+              disabled={saving || naming}
+              title="Clear the running playlist and stop playback"
+            >
+              <ListX size={13} />
+              Clear
+            </button>
+            <span className="queue-badge">{queue.length}</span>
+          </div>
+        )}
       </div>
+
+      {naming && (
+        <div className="queue-save-row">
+          <input
+            autoFocus
+            placeholder="New playlist name…"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void commitSave();
+              if (e.key === "Escape") {
+                setNaming(false);
+                setName("");
+              }
+            }}
+            onBlur={() => void commitSave()}
+          />
+        </div>
+      )}
 
       {queue.length === 0 ? (
         <div className="queue-empty">

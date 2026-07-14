@@ -12,6 +12,8 @@ class AudioController {
   private masterVolume = 1;
   /** True while a crossfade is overlapping; suppresses the outgoing `ended`. */
   private crossfading = false;
+  /** src currently primed (src-assigned + load()ed) on the idle element, or null. */
+  private primedSrc: string | null = null;
   private fade?: {
     outEl: HTMLAudioElement;
     inEl: HTMLAudioElement;
@@ -63,11 +65,64 @@ class AudioController {
   async play(src: string) {
     this.stopFade();
     this.idleEl.pause();
+    // A stale prime for a track that is no longer next must not be falsely
+    // reused later; the idle src is harmlessly overwritten on the next prime.
+    this.primedSrc = null;
     const el = this.activeEl;
     el.src = src;
     el.load();
     el.volume = this.masterVolume;
     await el.play();
+  }
+
+  /**
+   * Pre-buffer `src` on the idle element so a later crossfadeTo / playPrimed
+   * starts instantly. Does NOT play, does NOT touch the active element or any
+   * in-flight fade. Safe to call repeatedly; a no-op if already primed with src.
+   */
+  prime(src: string) {
+    // Never disturb the idle element while it is the OUTGOING/INCOMING side of a
+    // running fade — both physical elements are in use during a crossfade.
+    if (this.fade) return;
+    if (this.primedSrc === src && this.idleEl.src) return; // already warm
+    const el = this.idleEl;
+    el.src = src;
+    el.load();
+    el.volume = 0; // stays silent; crossfadeTo / playPrimed set the real volume
+    this.primedSrc = src;
+  }
+
+  /**
+   * Normal (non-crossfade) advance. If the idle element is already primed with
+   * `src`, adopt it as active and play at full volume — no cold load. Otherwise
+   * fall back to a regular play() on the active element.
+   */
+  async playPrimed(src: string) {
+    if (this.primedSrc === src && this.idleEl.src) {
+      this.stopFade();
+      const oldActive = this.activeEl;
+      oldActive.pause();
+      try {
+        oldActive.currentTime = 0;
+      } catch {
+        /* ignore */
+      }
+      this.active = this.active === 0 ? 1 : 0; // primed idle becomes active
+      this.primedSrc = null;
+      const el = this.activeEl; // now the formerly-idle, primed element
+      el.volume = this.masterVolume;
+      await el.play();
+      // Snap the UI to the new element's time immediately.
+      this.onTime?.(el.currentTime, el.duration || 0);
+      return;
+    }
+    await this.play(src);
+  }
+
+  /** Forget any pre-buffered idle element (its track is no longer next). */
+  clearPrime() {
+    this.primedSrc = null;
+    // Leave idleEl.src alone; it will be overwritten by the next prime/crossfade.
   }
 
   /**
@@ -79,9 +134,14 @@ class AudioController {
     this.stopFade();
     const outEl = this.activeEl;
     const inEl = this.idleEl;
-    inEl.src = src;
-    inEl.load();
+    if (this.primedSrc === src && inEl.src) {
+      // Idle element already primed with this exact URL — reuse the warm buffer.
+    } else {
+      inEl.src = src;
+      inEl.load();
+    }
     inEl.volume = 0;
+    this.primedSrc = null; // it's being consumed by the fade now
     this.crossfading = true;
     try {
       await inEl.play();
@@ -89,7 +149,7 @@ class AudioController {
       // Couldn't start the next track — abandon the fade and let the normal
       // end-of-track path take over instead.
       this.crossfading = false;
-      return;
+      return false;
     }
     this.fade = {
       outEl,
@@ -115,6 +175,7 @@ class AudioController {
       },
     };
     this.startFadeClock();
+    return true;
   }
 
   /**

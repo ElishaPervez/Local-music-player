@@ -9,9 +9,11 @@ import {
   Repeat,
   Repeat1,
   Shuffle,
+  Radio,
   Loader2,
 } from "lucide-react";
 import { usePlayerStore } from "../stores/playerStore";
+import { useLibraryStore } from "../stores/libraryStore";
 import { formatDuration } from "../lib/format";
 import Thumb from "./Thumb";
 import "./NowPlayingBar.css";
@@ -25,8 +27,10 @@ export default function NowPlayingBar() {
   const volume = usePlayerStore((s) => s.volume);
   const repeat = usePlayerStore((s) => s.repeat);
   const shuffle = usePlayerStore((s) => s.shuffle);
+  const autoPlay = usePlayerStore((s) => s.autoPlay);
   const loadingStream = usePlayerStore((s) => s.loadingStream);
 
+  const setAutoPlay = useLibraryStore((s) => s.setAutoPlay);
   const togglePlay = usePlayerStore((s) => s.togglePlay);
   const next = usePlayerStore((s) => s.next);
   const prev = usePlayerStore((s) => s.prev);
@@ -84,9 +88,21 @@ export default function NowPlayingBar() {
           <button
             className={`np-btn ${repeat !== "off" ? "active" : ""}`}
             onClick={cycleRepeat}
-            title={`Repeat: ${repeat}`}
+            disabled={autoPlay}
+            title={
+              autoPlay
+                ? "Repeat is off while Auto-play is on"
+                : `Repeat: ${repeat}`
+            }
           >
             {repeat === "one" ? <Repeat1 size={16} /> : <Repeat size={16} />}
+          </button>
+          <button
+            className={`np-btn ${autoPlay ? "active" : ""}`}
+            onClick={() => setAutoPlay(!autoPlay)}
+            title="Auto-play similar songs"
+          >
+            <Radio size={16} />
           </button>
         </div>
 

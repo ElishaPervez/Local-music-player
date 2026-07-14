@@ -108,6 +108,75 @@ pub async fn search(app: AppHandle, query: String) -> Result<Vec<SearchResult>, 
     Ok(results)
 }
 
+/// Fetch the YouTube "Mix" (RD radio) continuations for a seed video.
+/// Returns lightweight metadata, same shape as `search`. Skips the seed itself.
+#[tauri::command]
+pub async fn related_mix(
+    app: AppHandle,
+    video_id: String,
+    limit: u32,
+) -> Result<Vec<SearchResult>, String> {
+    let id = video_id.trim();
+    if id.is_empty() {
+        return Ok(vec![]);
+    }
+    let mix_url = format!("https://www.youtube.com/watch?v={id}&list=RD{id}");
+    let end = (limit + 1).clamp(2, 50); // +1 because start=2 skips the seed
+
+    let args: Vec<String> = vec![
+        "--dump-json".into(),
+        "--flat-playlist".into(),
+        "--no-warnings".into(),
+        "--ignore-errors".into(),
+        "--playlist-start".into(),
+        "2".into(), // skip the seed (item 1 is the seed itself)
+        "--playlist-end".into(),
+        end.to_string(),
+        mix_url,
+    ];
+
+    let output = app
+        .shell()
+        .sidecar("yt-dlp")
+        .map_err(|e| e.to_string())?
+        .args(args)
+        .output()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut results = Vec::new();
+    for line in stdout.lines() {
+        let line = line.trim();
+        if !line.starts_with('{') {
+            continue;
+        }
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(line) {
+            // A dead/empty mix can echo only the seed back; never return it.
+            if let Some(r) = entry_to_result(&v) {
+                if r.video_id != id {
+                    results.push(r);
+                }
+            }
+        }
+    }
+    // Distinguish a clean-empty mix (genuinely dead/obscure seed — a valid
+    // outcome the caller blacklists) from a failed exit (throttle / 429 / bot
+    // check). On a non-zero exit with nothing parsed, surface an error so the
+    // JS catch{} treats it as transient and leaves the seed eligible to retry,
+    // rather than permanently marking a merely-throttled seed dead. Mirrors
+    // `search`'s `results.is_empty() && !status.success()` branch.
+    if results.is_empty() && !output.status.success() {
+        let err = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(if err.is_empty() {
+            "related_mix failed".into()
+        } else {
+            err
+        });
+    }
+    Ok(results)
+}
+
 fn entry_to_result(v: &serde_json::Value) -> Option<SearchResult> {
     let id = v.get("id")?.as_str()?.to_string();
     let title = v
@@ -195,7 +264,20 @@ pub async fn download_song(
     let dir = library_dir.trim_end_matches(['/', '\\']).to_string();
     let out_template = format!("{dir}/%(id)s.%(ext)s");
 
+    // Audio-only source selection. Match the source codec to the target format
+    // so yt-dlp copy-remuxes (no re-encode) where possible, and never fall back
+    // to a muxed video stream the way the no-`-f` default can. bestaudio* picks
+    // the best audio-only stream; the trailing /bestaudio guarantees a match on
+    // odd sources.
+    let fmt_selector = match format.as_str() {
+        "opus" => "bestaudio[acodec=opus]/bestaudio[ext=webm]/bestaudio*/bestaudio",
+        "m4a" => "bestaudio[ext=m4a]/bestaudio[acodec=aac]/bestaudio*/bestaudio",
+        _ => "bestaudio*/bestaudio", // mp3 (transcode unavoidable) and any other
+    };
+
     let mut args: Vec<String> = vec![
+        "-f".into(),
+        fmt_selector.into(),
         "-x".into(),
         "--audio-format".into(),
         format.clone(),

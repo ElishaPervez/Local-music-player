@@ -1,6 +1,6 @@
 [package]
 name = "tauri-app"
-version = "0.2.0"
+version = "0.3.0"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -30,4 +30,3 @@ futures-util = "0.3"
 tokio = { version = "1", features = ["time"] }
 zip = { version = "2", default-features = false, features = ["deflate"] }
 discord-rich-presence = "1"
-

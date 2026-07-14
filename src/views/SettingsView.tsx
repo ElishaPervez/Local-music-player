@@ -221,6 +221,28 @@ export default function SettingsView() {
 
           <div className="setting-row">
             <div className="setting-info">
+              <Radio size={18} />
+              <div>
+                <strong>Auto-play radio</strong>
+                <p>
+                  When the queue runs low, automatically stream similar songs
+                  (not downloaded)
+                </p>
+              </div>
+            </div>
+            <button
+              role="switch"
+              aria-checked={settings.autoPlay}
+              className={`switch ${settings.autoPlay ? "on" : ""}`}
+              onClick={() => setSettings({ autoPlay: !settings.autoPlay })}
+              title="Toggle auto-play radio"
+            >
+              <span className="switch-knob" />
+            </button>
+          </div>
+
+          <div className="setting-row">
+            <div className="setting-info">
               <ImageIcon size={18} />
               <div>
                 <strong>Background</strong>

@@ -71,6 +71,14 @@
 .np-btn.active {
   color: var(--accent-2);
 }
+.np-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.np-btn:disabled:hover {
+  color: var(--text-dim);
+  background: none;
+}
 /* Spin flourish each time shuffle is switched on. */
 @keyframes shuffle-pop {
   0% {

@@ -25,6 +25,7 @@ interface LibraryState {
   reorderPlaylist: (playlistId: string, songIds: string[]) => void;
 
   setSettings: (patch: Partial<Settings>) => void;
+  setAutoPlay: (on: boolean) => void;
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -33,6 +34,7 @@ const DEFAULT_SETTINGS: Settings = {
   background: null,
   crossfade: false,
   discordPresence: true,
+  autoPlay: false,
 };
 
 export const useLibraryStore = create<LibraryState>((set, get) => {
@@ -67,11 +69,19 @@ export const useLibraryStore = create<LibraryState>((set, get) => {
       set({ ...data, loaded: true });
       // Mirror the persisted crossfade preference into the player runtime.
       usePlayerStore.getState().setCrossfade(data.settings.crossfade);
+      // The auto-player de-dupes its picks against downloaded songs; push the
+      // current library videoIds in (avoids a playerStore → libraryStore cycle)
+      // BEFORE enabling auto-play, so the de-dupe set is populated before any
+      // top-up that setAutoPlay might kick off can fire.
+      usePlayerStore.getState().setLibraryVideoIds(Object.keys(data.songs));
+      // Mirror auto-play too, so a saved preference is live from launch.
+      usePlayerStore.getState().setAutoPlay(data.settings.autoPlay);
     },
 
     addSong: (song) => {
       set((s) => ({ songs: { ...s.songs, [song.id]: song } }));
       persist();
+      usePlayerStore.getState().setLibraryVideoIds(Object.keys(get().songs));
     },
 
     updateSong: (id, patch) => {
@@ -81,6 +91,8 @@ export const useLibraryStore = create<LibraryState>((set, get) => {
         return { songs: { ...s.songs, [id]: { ...existing, ...patch } } };
       });
       persist();
+      const updated = get().songs[id];
+      if (updated) usePlayerStore.getState().syncLibrarySong(updated);
     },
 
     deleteSong: async (id) => {
@@ -95,6 +107,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => {
         return { songs, playlists };
       });
       persist();
+      usePlayerStore.getState().setLibraryVideoIds(Object.keys(get().songs));
       // The file is gone library-wide, so it can't stay in the live queue.
       usePlayerStore.getState().removeSongFromQueue(id);
       if (song?.filePath) {
@@ -130,6 +143,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => {
     deletePlaylist: (id) => {
       set((s) => ({ playlists: s.playlists.filter((p) => p.id !== id) }));
       persist();
+      usePlayerStore.getState().detachPlaylist(id);
     },
 
     addToPlaylist: (playlistId, songId) => {
@@ -184,6 +198,15 @@ export const useLibraryStore = create<LibraryState>((set, get) => {
       if (patch.crossfade !== undefined) {
         usePlayerStore.getState().setCrossfade(patch.crossfade);
       }
+      if (patch.autoPlay !== undefined) {
+        usePlayerStore.getState().setAutoPlay(patch.autoPlay);
+      }
+    },
+
+    // Persist the auto-play preference (and mirror it into the player runtime
+    // via setSettings' crossfade-style hook above).
+    setAutoPlay: (on) => {
+      get().setSettings({ autoPlay: on });
     },
   };
 });
