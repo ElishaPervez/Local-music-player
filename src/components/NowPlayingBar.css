@@ -17,10 +17,27 @@
   gap: 12px;
   min-width: 0;
 }
+.np-thumb-wrap {
+  flex-shrink: 0;
+  animation: np-thumb-in 0.4s var(--ease-spring) both;
+}
+@keyframes np-thumb-in {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
 .np-meta {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  animation: np-meta-in 0.35s var(--ease-out) both;
+}
+@keyframes np-meta-in {
+  from {
+    opacity: 0;
+    transform: translateY(9px);
+  }
 }
 .np-title {
   font-weight: 600;
@@ -70,6 +87,25 @@
 }
 .np-btn.active {
   color: var(--accent-2);
+  position: relative;
+}
+/* Active toggles (shuffle / repeat / auto-play) get a small pip that pops in. */
+.np-btn.active::after {
+  content: "";
+  position: absolute;
+  bottom: 1px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: var(--accent-2);
+  animation: pip-in 0.28s var(--ease-spring) both;
+}
+@keyframes pip-in {
+  from {
+    transform: scale(0);
+  }
 }
 .np-btn:disabled {
   opacity: 0.35;
@@ -97,12 +133,23 @@
 .np-play {
   width: 40px;
   height: 40px;
-  background: var(--text);
-  color: var(--bg);
+  background: var(--accent-grad);
+  color: #fff;
+  box-shadow: 0 2px 14px rgba(124, 92, 255, 0.35);
+  transition:
+    transform 0.18s var(--ease-spring),
+    box-shadow 0.18s var(--ease-out),
+    filter 0.15s var(--ease);
 }
 .np-play:hover {
-  background: #fff;
-  color: var(--bg);
+  background: var(--accent-grad);
+  color: #fff;
+  filter: brightness(1.12);
+  transform: scale(1.08);
+  box-shadow: 0 4px 20px rgba(124, 92, 255, 0.5);
+}
+.np-play:active {
+  transform: scale(0.94);
 }
 .np-play:disabled {
   opacity: 0.4;
@@ -166,6 +213,11 @@
   );
   cursor: pointer;
   outline: none;
+  transition: height 0.15s var(--ease-out);
+}
+/* The bar thickens under the pointer so it's easier to grab. */
+.np-range:hover:not(:disabled) {
+  height: 7px;
 }
 .np-range:disabled {
   cursor: default;

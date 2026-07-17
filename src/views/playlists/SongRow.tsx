@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import {
   GripVertical,
   Play,
@@ -47,7 +47,8 @@ export default function SongRow({
     transition,
     opacity: isDragging ? 0.5 : 1,
     zIndex: isDragging ? 1 : undefined,
-  };
+    "--i": Math.min(index, 14),
+  } as CSSProperties;
 
   function commitTitle() {
     const t = title.trim();

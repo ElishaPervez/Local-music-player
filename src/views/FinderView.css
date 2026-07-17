@@ -15,8 +15,17 @@
   flex-shrink: 0;
   transition: border-color 0.15s var(--ease);
 }
+.search-bar {
+  transition:
+    border-color 0.2s var(--ease),
+    box-shadow 0.2s var(--ease);
+}
 .search-bar:focus-within {
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.search-bar:focus-within .search-icon:first-child {
+  color: var(--accent-2);
 }
 .search-icon {
   color: var(--text-faint);
@@ -54,9 +63,24 @@
   padding: 6px 10px;
   border-radius: var(--radius-sm);
   transition: background 0.12s var(--ease);
+  /* Rows cascade in from below when results land. */
+  animation: result-enter 0.38s var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 28ms);
+}
+@keyframes result-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
 }
 .result-row:hover {
   background: var(--bg-elev);
+}
+.result-row:hover .thumb {
+  transform: scale(1.05);
+}
+.result-row .thumb {
+  transition: transform 0.25s var(--ease-out);
 }
 
 .result-play {
@@ -69,11 +93,16 @@
   color: var(--text-dim);
   transition:
     color 0.12s var(--ease),
-    background 0.12s var(--ease);
+    background 0.12s var(--ease),
+    transform 0.15s var(--ease-spring);
 }
 .result-play:hover {
-  color: var(--text);
-  background: var(--bg-hover);
+  color: #fff;
+  background: var(--accent);
+  transform: scale(1.12);
+}
+.result-play:active {
+  transform: scale(0.95);
 }
 
 .result-meta {

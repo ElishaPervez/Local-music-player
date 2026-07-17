@@ -60,6 +60,15 @@
   border-radius: 10px;
   background: var(--bg);
   transition: background 0.12s var(--ease);
+  /* Rows fade in with a slight cascade when the playlist opens. Opacity only:
+     a transform keyframe would fight dnd-kit's inline drag transform. */
+  animation: song-enter 0.35s var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 24ms);
+}
+@keyframes song-enter {
+  from {
+    opacity: 0;
+  }
 }
 .song-row:hover {
   background: var(--bg-elev);
@@ -190,6 +199,14 @@
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
   padding: 6px;
   z-index: 50;
+  transform-origin: top right;
+  animation: menu-pop 0.18s var(--ease-out) both;
+}
+@keyframes menu-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(-4px);
+  }
 }
 .row-menu-item {
   display: flex;

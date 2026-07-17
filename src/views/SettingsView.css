@@ -15,6 +15,28 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   margin-bottom: 12px;
+  animation: setting-enter 0.35s var(--ease-out) both;
+}
+.setting-row:nth-child(2) {
+  animation-delay: 40ms;
+}
+.setting-row:nth-child(3) {
+  animation-delay: 80ms;
+}
+.setting-row:nth-child(4) {
+  animation-delay: 120ms;
+}
+.setting-row:nth-child(5) {
+  animation-delay: 160ms;
+}
+.setting-row:nth-child(n + 6) {
+  animation-delay: 200ms;
+}
+@keyframes setting-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
 }
 .setting-info {
   display: flex;

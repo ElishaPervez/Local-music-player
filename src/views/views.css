@@ -4,6 +4,24 @@
   min-width: 0;
 }
 
+/* Tab-switch entrance: content rises and settles while it fades in. */
+.view-anim {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  animation: view-enter 0.32s var(--ease-out) both;
+}
+@keyframes view-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.995);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .view-content {
   flex: 1;
   min-width: 0;
@@ -33,6 +51,26 @@
   text-align: center;
   color: var(--text-faint);
   padding: 40px;
+  animation: empty-enter 0.4s var(--ease-out) both;
+}
+@keyframes empty-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+/* The big icon drifts gently so empty screens feel alive, not dead. */
+.empty-state > svg {
+  animation: empty-float 4.5s ease-in-out infinite;
+}
+@keyframes empty-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
 }
 .empty-state p {
   font-weight: 600;

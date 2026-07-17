@@ -1,15 +1,21 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { Play, Download, Check, Loader2, AlertCircle } from "lucide-react";
 import type { SearchResult } from "../../lib/types";
 import { formatDuration } from "../../lib/format";
-import { resultToStreamItem } from "../../lib/playback";
+import { resultToStreamItem, songToItem } from "../../lib/playback";
 import { usePlayerStore } from "../../stores/playerStore";
 import { useDownloadsStore } from "../../stores/downloadsStore";
 import { useLibraryStore } from "../../stores/libraryStore";
 import Thumb from "../../components/Thumb";
 import PlaylistPicker from "../../components/PlaylistPicker";
 
-export default function ResultRow({ result }: { result: SearchResult }) {
+export default function ResultRow({
+  result,
+  index = 0,
+}: {
+  result: SearchResult;
+  index?: number;
+}) {
   const playNow = usePlayerStore((s) => s.playNow);
   const dl = useDownloadsStore((s) => s.byVideo[result.videoId]);
   const inLibrary = useLibraryStore((s) => !!s.songs[result.videoId]);
@@ -54,11 +60,20 @@ export default function ResultRow({ result }: { result: SearchResult }) {
   }
 
   return (
-    <div className="result-row">
+    <div
+      className="result-row"
+      // Stagger index for the entrance animation; capped so late rows
+      // don't keep the list feeling sluggish.
+      style={{ "--i": Math.min(index, 14) } as CSSProperties}
+    >
       <button
         className="result-play"
-        onClick={() => void playNow(resultToStreamItem(result))}
-        title="Play now (stream)"
+        onClick={() => {
+          // Already downloaded? Play the local file, not a YouTube stream.
+          const song = useLibraryStore.getState().songs[result.videoId];
+          void playNow(song ? songToItem(song) : resultToStreamItem(result));
+        }}
+        title={inLibrary ? "Play now (downloaded)" : "Play now (stream)"}
       >
         <Play size={16} fill="currentColor" />
       </button>

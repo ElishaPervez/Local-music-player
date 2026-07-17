@@ -57,6 +57,13 @@
   color: var(--text-dim);
   padding: 2px 8px;
   border-radius: 10px;
+  animation: badge-pop 0.3s var(--ease-spring);
+}
+@keyframes badge-pop {
+  50% {
+    transform: scale(1.25);
+    color: var(--accent-2);
+  }
 }
 
 /* Header action buttons (Save / Clear), pushed as a group — with the count
@@ -100,6 +107,13 @@
   padding: 8px 12px;
   flex-shrink: 0;
   border-bottom: 1px solid var(--border-soft);
+  animation: save-slide 0.22s var(--ease-out) both;
+}
+@keyframes save-slide {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
 }
 .queue-save-row input {
   width: 100%;
@@ -171,6 +185,15 @@
   border-radius: var(--radius-sm);
   cursor: grab;
   transition: background 0.12s var(--ease);
+  /* New tracks slide in from the right edge as they join the queue.
+     Opacity-led so it doesn't fight dnd-kit's drag transform. */
+  animation: queue-enter 0.3s var(--ease-out);
+}
+@keyframes queue-enter {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
 }
 .queue-row:hover {
   background: var(--bg-hover);
@@ -231,15 +254,20 @@
   border-radius: 8px;
 }
 
-.queue-eq {
-  width: 34px;
-  height: 34px;
+/* Wave icon beside the current track's title; pulses while audio plays and
+   sits steady when paused. */
+.queue-wave {
+  display: inline-flex;
   flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  border-radius: 5px;
-  background: var(--accent-soft);
   color: var(--accent-2);
+}
+.queue-wave.playing {
+  animation: wave-pulse 1.2s ease-in-out infinite;
+}
+@keyframes wave-pulse {
+  50% {
+    opacity: 0.4;
+  }
 }
 
 .queue-meta {
@@ -250,8 +278,14 @@
   cursor: pointer;
 }
 .queue-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
   font-size: 13px;
   font-weight: 550;
+}
+.queue-title-text {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -283,7 +317,14 @@
   vertical-align: middle;
 }
 
-.queue-remove {
+/* Row actions (download for streamed tracks, remove), revealed on hover. */
+.queue-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.queue-action {
   width: 26px;
   height: 26px;
   display: grid;
@@ -297,10 +338,16 @@
     color 0.12s var(--ease),
     background 0.12s var(--ease);
 }
-.queue-row:hover .queue-remove {
+.queue-row:hover .queue-action {
   opacity: 1;
 }
-.queue-remove:hover {
+/* The download button stays visible without hovering — it marks the row as
+   not-yet-downloaded. (Downloaded rows simply don't render it.) */
+.queue-dl-btn {
+  opacity: 1;
+  color: var(--text-dim);
+}
+.queue-action:hover {
   color: var(--text);
   background: var(--bg-elev-2);
 }

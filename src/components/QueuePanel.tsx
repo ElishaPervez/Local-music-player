@@ -3,12 +3,13 @@ import {
   ListVideo,
   X,
   GripVertical,
-  Volume2,
   Radio,
   Save,
   Check,
   AlertCircle,
   ListX,
+  AudioLines,
+  Download,
 } from "lucide-react";
 import {
   DndContext,
@@ -30,7 +31,7 @@ import { usePlayerStore } from "../stores/playerStore";
 import { useDownloadsStore } from "../stores/downloadsStore";
 import { useUIStore, QUEUE_W_DEFAULT } from "../stores/uiStore";
 import { useFlipReorder } from "../lib/useFlipReorder";
-import { saveQueueAsPlaylist } from "../lib/downloadService";
+import { saveQueueAsPlaylist, ensureSongInLibrary } from "../lib/downloadService";
 import Thumb from "./Thumb";
 import "./QueuePanel.css";
 
@@ -45,6 +46,8 @@ function QueueRow({
 }) {
   const jumpTo = usePlayerStore((s) => s.jumpTo);
   const removeFromQueue = usePlayerStore((s) => s.removeFromQueue);
+  const isPlaying = usePlayerStore((s) => s.isPlaying);
+  const adoptDownloadedSong = usePlayerStore((s) => s.adoptDownloadedSong);
   // Live download state while this track is being saved into a playlist.
   const dl = useDownloadsStore((s) => s.byVideo[item.videoId]);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
@@ -74,15 +77,19 @@ function QueueRow({
           <GripVertical size={14} />
         </span>
       </span>
-      {isCurrent ? (
-        <span className="queue-eq">
-          <Volume2 size={14} />
-        </span>
-      ) : (
-        <Thumb src={item.thumbnail} size={34} radius={5} />
-      )}
+      <Thumb src={item.thumbnail} size={34} radius={5} />
       <div className="queue-meta" onClick={() => jumpTo(index)}>
-        <span className="queue-title">{item.title}</span>
+        <span className="queue-title">
+          {isCurrent && (
+            <span
+              className={`queue-wave ${isPlaying ? "playing" : ""}`}
+              title={isPlaying ? "Now playing" : "Paused"}
+            >
+              <AudioLines size={13} />
+            </span>
+          )}
+          <span className="queue-title-text">{item.title}</span>
+        </span>
         <span className="queue-artist">
           {item.auto && item.source.kind === "stream" && (
             <span className="queue-auto-badge" title="Auto-played radio pick">
@@ -113,13 +120,35 @@ function QueueRow({
           )}
         </span>
       ) : (
-        <button
-          className="queue-remove"
-          onClick={() => removeFromQueue(item.key)}
-          title="Remove from queue"
-        >
-          <X size={15} />
-        </button>
+        <span className="queue-actions">
+          {item.source.kind === "stream" && (
+            <button
+              className="queue-action queue-dl-btn"
+              onClick={() => {
+                void ensureSongInLibrary({
+                  videoId: item.videoId,
+                  title: item.title,
+                  artist: item.artist,
+                  durationSec: item.durationSec,
+                  thumbnail: item.thumbnail,
+                  url: `https://www.youtube.com/watch?v=${item.videoId}`,
+                }).then((song) => {
+                  if (song) adoptDownloadedSong(song);
+                });
+              }}
+              title="Download to library"
+            >
+              <Download size={14} />
+            </button>
+          )}
+          <button
+            className="queue-action"
+            onClick={() => removeFromQueue(item.key)}
+            title="Remove from queue"
+          >
+            <X size={15} />
+          </button>
+        </span>
       )}
     </div>
   );
@@ -236,7 +265,9 @@ export default function QueuePanel() {
               <ListX size={13} />
               Clear
             </button>
-            <span className="queue-badge">{queue.length}</span>
+            <span className="queue-badge" key={queue.length}>
+              {queue.length}
+            </span>
           </div>
         )}
       </div>

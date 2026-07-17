@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { Plus, ListMusic } from "lucide-react";
 import { useLibraryStore } from "../stores/libraryStore";
 import { useUIStore } from "../stores/uiStore";
@@ -80,7 +80,7 @@ export default function PlaylistsView() {
             </div>
           ) : (
             <div className="playlist-grid">
-              {playlists.map((p) => {
+              {playlists.map((p, i) => {
                 const first = p.songIds
                   .map((id) => songs[id])
                   .find((s) => s?.thumbnail);
@@ -89,6 +89,7 @@ export default function PlaylistsView() {
                     key={p.id}
                     className="playlist-card"
                     onClick={() => setSelected(p.id)}
+                    style={{ "--i": Math.min(i, 11) } as CSSProperties}
                   >
                     <Thumb src={first?.thumbnail} size={140} radius={10} />
                     <span className="playlist-card-name">{p.name}</span>

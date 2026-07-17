@@ -224,6 +224,7 @@ interface PlayerState {
   setAutoPlay: (on: boolean) => void;
   setLibraryVideoIds: (ids: string[]) => void;
   syncLibrarySong: (song: Song) => void;
+  adoptDownloadedSong: (song: Song) => void;
   detachPlaylist: (playlistId: string) => void;
   jumpTo: (index: number) => void;
   reorderQueue: (items: PlaybackItem[]) => void;
@@ -574,6 +575,22 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
               artist: song.artist,
               durationSec: song.durationSec,
               thumbnail: song.thumbnail,
+              source: { kind: "local" as const, path: song.filePath },
+            }
+          : item,
+      ),
+    })),
+
+  adoptDownloadedSong: (song) =>
+    // After a queued stream is downloaded, point its queue entries at the local
+    // file so future plays are offline. The source is only read on load, so the
+    // currently-playing stream keeps playing uninterrupted.
+    set((s) => ({
+      queue: s.queue.map((item) =>
+        item.videoId === song.videoId && item.source.kind === "stream"
+          ? {
+              ...item,
+              songId: song.id,
               source: { kind: "local" as const, path: song.filePath },
             }
           : item,

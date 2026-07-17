@@ -2,14 +2,27 @@
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   display: grid;
   place-items: center;
   z-index: 100;
-  animation: picker-fade 0.12s var(--ease);
+  animation: picker-fade 0.2s var(--ease-out);
 }
 @keyframes picker-fade {
   from {
     opacity: 0;
+  }
+}
+
+/* Any dialog inside the overlay springs up into place. */
+.picker-overlay > * {
+  animation: modal-pop 0.28s var(--ease-spring) both;
+}
+@keyframes modal-pop {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.94);
   }
 }
 
@@ -19,7 +32,7 @@
   background: var(--bg-elev-2);
   border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-pop);
   display: flex;
   flex-direction: column;
   overflow: hidden;

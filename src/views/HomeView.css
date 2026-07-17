@@ -1,0 +1,448 @@
+/* ————————————————————————————— Home ————————————————————————————— */
+
+.home-scroll {
+  overflow-y: auto;
+}
+
+.home-content {
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 34px 28px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 34px;
+}
+
+/* ——— Hero: turntable ——— */
+
+.home-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  padding-top: 8px;
+}
+
+.disc-stage {
+  position: relative;
+  width: 270px;
+  height: 270px;
+}
+
+/* Ambient light that breathes only while music is audible. */
+.disc-glow {
+  position: absolute;
+  inset: -46px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(124, 92, 255, 0.28) 0%,
+    rgba(124, 92, 255, 0.08) 45%,
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 0.8s var(--ease);
+  pointer-events: none;
+}
+.home-hero.playing .disc-glow {
+  opacity: 1;
+  animation: glow-breathe 5s ease-in-out infinite;
+}
+@keyframes glow-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+}
+
+.disc {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  padding: 0;
+  display: block;
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.55),
+    0 4px 14px rgba(0, 0, 0, 0.4);
+  transition: transform 0.25s var(--ease-out);
+}
+.disc:hover {
+  transform: scale(1.015);
+}
+.disc:active {
+  transform: scale(0.985);
+}
+
+/* Everything that visually belongs to the record rotates together. */
+.disc-spin {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  animation: disc-rotate 9s linear infinite;
+  animation-play-state: paused;
+}
+.home-hero.playing .disc-spin {
+  animation-play-state: running;
+}
+@keyframes disc-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Pressed-vinyl surface: fine groove rings over a near-black platter, with
+   two brighter "track separator" bands so the surface reads as a real record
+   even while spinning. */
+.disc-grooves {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    repeating-radial-gradient(
+      circle at 50% 50%,
+      rgba(255, 255, 255, 0.045) 0px,
+      rgba(255, 255, 255, 0.045) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    radial-gradient(
+      circle at 50% 50%,
+      #14151b 0%,
+      #101117 34%,
+      rgba(255, 255, 255, 0.05) 35%,
+      #0e0f14 36%,
+      #101117 55%,
+      rgba(255, 255, 255, 0.045) 56%,
+      #0d0e13 57%,
+      #0b0c10 78%,
+      #08090c 100%
+    );
+}
+
+/* Center label: the song's artwork, pressed under a ring. */
+.disc-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 39%;
+  height: 39%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--accent-grad);
+  color: rgba(255, 255, 255, 0.85);
+  border: 3px solid rgba(0, 0, 0, 0.55);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.disc-label img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.disc-hole {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 11px;
+  height: 11px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--bg);
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.9),
+    0 0 0 2px rgba(255, 255, 255, 0.07);
+}
+
+/* Static specular reflection — the room's light doesn't spin with the record. */
+.disc-sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 210deg,
+    transparent 0deg,
+    rgba(255, 255, 255, 0.085) 40deg,
+    transparent 85deg,
+    transparent 175deg,
+    rgba(255, 255, 255, 0.05) 215deg,
+    transparent 260deg
+  );
+  pointer-events: none;
+}
+
+/* ——— Tonearm: rests off the record, swings on when music plays ——— */
+
+.tonearm {
+  position: absolute;
+  top: -14px;
+  right: -22px;
+  width: 44px;
+  height: 44px;
+  pointer-events: none;
+  filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.45));
+}
+
+.tonearm-pivot {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #3a3f4e, #1d202a 70%);
+  border: 1px solid #333847;
+}
+
+.tonearm-rod {
+  position: absolute;
+  top: 14px;
+  right: 13px;
+  width: 4px;
+  height: 128px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #4a5062, #2a2e3a);
+  transform-origin: 50% 2px;
+  /* Resting: tipped away, clear of the platter. Playing: needle drops onto
+     the outer grooves. Positive angles swing the tip toward the record. */
+  transform: rotate(-17deg);
+  transition: transform 0.9s var(--ease-spring);
+}
+.home-hero.playing .tonearm-rod {
+  transform: rotate(18deg);
+}
+
+.tonearm-head {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%) rotate(0deg);
+  width: 12px;
+  height: 22px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #5a6175, #343a49);
+  border: 1px solid #262a36;
+}
+
+/* ——— Hero text ——— */
+
+.hero-meta {
+  text-align: center;
+  max-width: 560px;
+  min-width: 0;
+}
+
+.hero-title {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.hero-artist {
+  margin-top: 5px;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.home-hero.idle .hero-title {
+  color: var(--text-dim);
+}
+.home-hero.idle .hero-artist {
+  color: var(--text-faint);
+}
+.home-hero.idle .disc-grooves,
+.home-hero.idle .disc-label {
+  filter: saturate(0.6) brightness(0.85);
+}
+
+/* ——— Sections ——— */
+
+.home-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.section-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.section-clear {
+  font-size: 12px;
+  color: var(--text-faint);
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  transition:
+    color 0.15s var(--ease),
+    background 0.15s var(--ease);
+}
+.section-clear:hover {
+  color: var(--text-dim);
+  background: var(--bg-hover);
+}
+
+.section-hint {
+  font-size: 13px;
+  color: var(--text-faint);
+}
+
+/* ——— Recently played shelf ——— */
+
+.played-shelf {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  /* Let card hover-lift and entrance rise render outside the scroll box. */
+  margin: -6px;
+  padding: 6px 6px 10px;
+}
+
+.played-card {
+  flex-shrink: 0;
+  width: 148px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  border-radius: var(--radius);
+  animation: card-enter 0.4s var(--ease-out) both;
+  animation-delay: calc(var(--i) * 40ms);
+  transition: transform 0.2s var(--ease-out);
+}
+.played-card:hover {
+  transform: translateY(-3px);
+}
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+.played-thumb {
+  position: relative;
+  width: 148px;
+  height: 148px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg-elev-2);
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+  margin-bottom: 4px;
+}
+.played-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.played-play {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent-grad);
+  color: #fff;
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity 0.18s var(--ease),
+    transform 0.18s var(--ease-out);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+.played-card:hover .played-play {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.played-title {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.3;
+}
+
+.played-artist {
+  font-size: 12px;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ——— Recently searched chips ——— */
+
+.search-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.search-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-soft);
+  color: var(--text-dim);
+  font-size: 13px;
+  max-width: 260px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: card-enter 0.35s var(--ease-out) both;
+  animation-delay: calc(var(--i) * 30ms);
+  transition:
+    background 0.15s var(--ease),
+    color 0.15s var(--ease),
+    border-color 0.15s var(--ease);
+}
+.search-chip:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: var(--border);
+}
+.search-chip svg {
+  flex-shrink: 0;
+  color: var(--text-faint);
+}

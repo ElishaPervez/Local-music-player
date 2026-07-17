@@ -23,6 +23,9 @@ dist-ssr
 *.sln
 *.sw?
 
+# Playwright MCP scratch output (screenshots, console logs from test runs)
+.playwright-mcp/
+
 # External tool binaries — too large for git; fetched by `npm run setup`
 # (scripts/setup-tools.ps1, also runs automatically before dev/build)
 src-tauri/binaries/

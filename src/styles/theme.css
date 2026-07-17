@@ -24,6 +24,11 @@
   --sidebar-w-collapsed: 64px;
   --transport-h: 84px;
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.44, 1);
+  --accent-grad: linear-gradient(135deg, #8b6bff 0%, #6a48f2 100%);
+  --danger: #ef5f6b;
+  --shadow-pop: 0 20px 60px rgba(0, 0, 0, 0.5);
 
   color-scheme: dark;
 }
@@ -148,4 +153,50 @@ h3 {
 .icon-btn.danger:hover {
   background: rgba(255, 107, 107, 0.12);
   color: #ff6b6b;
+}
+
+/* Text selection tinted to the accent */
+::selection {
+  background: rgba(124, 92, 255, 0.35);
+}
+
+/* Visible keyboard focus without polluting mouse interactions */
+:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Buttons compress slightly under the pointer, app-wide */
+.btn-primary:active:not(:disabled),
+.btn-secondary:active:not(:disabled),
+.icon-btn:active {
+  transform: scale(0.96);
+}
+.btn-primary,
+.btn-secondary,
+.icon-btn {
+  transition:
+    background 0.15s var(--ease),
+    color 0.15s var(--ease),
+    transform 0.12s var(--ease-out);
+}
+.btn-primary {
+  background: var(--accent-grad);
+  box-shadow: 0 2px 12px rgba(124, 92, 255, 0.25);
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-grad);
+  filter: brightness(1.12);
+  box-shadow: 0 4px 18px rgba(124, 92, 255, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

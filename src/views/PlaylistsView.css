@@ -8,6 +8,13 @@
 
 .playlist-create {
   margin-bottom: 16px;
+  animation: create-slide 0.25s var(--ease-out) both;
+}
+@keyframes create-slide {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
 }
 .playlist-create input {
   width: 100%;
@@ -37,20 +44,38 @@
   transition:
     background 0.15s var(--ease),
     border-color 0.15s var(--ease),
-    transform 0.1s var(--ease);
+    transform 0.2s var(--ease-out),
+    box-shadow 0.2s var(--ease-out);
+  /* Cards pop up one after another when the grid appears. */
+  animation: card-pop 0.42s var(--ease-spring) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+@keyframes card-pop {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.92);
+  }
 }
 .playlist-card:hover {
   background: var(--bg-elev-2);
   border-color: var(--border);
+  transform: translateY(-4px);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
 }
 .playlist-card:active {
-  transform: scale(0.985);
+  transform: translateY(-1px) scale(0.985);
 }
 .playlist-card .thumb {
   width: 100% !important;
   aspect-ratio: 1;
   height: auto !important;
   margin-bottom: 8px;
+}
+.playlist-card .thumb img {
+  transition: transform 0.35s var(--ease-out);
+}
+.playlist-card:hover .thumb img {
+  transform: scale(1.07);
 }
 .playlist-card-name {
   font-weight: 600;

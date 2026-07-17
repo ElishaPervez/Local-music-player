@@ -102,6 +102,20 @@
 .nav-item.active {
   background: var(--accent-soft);
   color: var(--accent-2);
+  animation: nav-pop 0.3s var(--ease-spring);
+}
+@keyframes nav-pop {
+  from {
+    transform: scale(0.96);
+  }
+}
+.nav-item.active .nav-icon {
+  animation: nav-icon-pop 0.35s var(--ease-spring);
+}
+@keyframes nav-icon-pop {
+  50% {
+    transform: scale(1.2) rotate(-4deg);
+  }
 }
 .nav-icon {
   flex-shrink: 0;

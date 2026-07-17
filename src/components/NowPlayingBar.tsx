@@ -46,8 +46,12 @@ export default function NowPlayingBar() {
 
   return (
     <footer className="now-playing">
-      <div className="np-track">
-        <Thumb src={current?.thumbnail} size={52} radius={8} />
+      {/* Keyed by track: a song change remounts this block and replays the
+          slide-up entrance. */}
+      <div className="np-track" key={current?.key ?? "idle"}>
+        <div className="np-thumb-wrap">
+          <Thumb src={current?.thumbnail} size={52} radius={8} />
+        </div>
         <div className="np-meta">
           <span className="np-title">{current?.title ?? "Nothing playing"}</span>
           <span className="np-artist">

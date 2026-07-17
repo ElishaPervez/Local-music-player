@@ -1,4 +1,5 @@
 import {
+  Home,
   Search,
   ListMusic,
   Settings,
@@ -9,6 +10,7 @@ import { useUIStore, type View } from "../stores/uiStore";
 import "./Sidebar.css";
 
 const NAV: { id: View; label: string; icon: typeof Search }[] = [
+  { id: "home", label: "Home", icon: Home },
   { id: "finder", label: "Finder", icon: Search },
   { id: "playlists", label: "Playlists", icon: ListMusic },
 ];
