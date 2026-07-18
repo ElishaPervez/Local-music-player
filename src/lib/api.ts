@@ -13,7 +13,15 @@ export const api = {
     videoId: string;
     libraryDir: string;
     format: string;
-  }) => invoke<{ videoId: string; filePath: string }>("download_song", args),
+  }) =>
+    invoke<{
+      videoId: string;
+      filePath: string;
+      track: string | null;
+      artist: string | null;
+    }>("download_song", args),
+  musicCredits: (videoId: string, videoTitle: string) =>
+    invoke<MusicCredits>("music_credits", { videoId, videoTitle }),
   deleteFile: (path: string) => invoke<void>("delete_file", { path }),
   importBackground: (srcPath: string, name: string) =>
     invoke<string>("import_background", { srcPath, name }),
@@ -37,6 +45,13 @@ export interface DiscordPresence {
   repeat: string;
   shuffle: boolean;
   playlistName: string | null;
+}
+
+/** YouTube's own music credits for a video (real song title / real artist,
+ *  from the YouTube Music catalog); null fields when the video has none. */
+export interface MusicCredits {
+  track: string | null;
+  artist: string | null;
 }
 
 export interface ToolsStatus {

@@ -130,6 +130,20 @@
   padding-top: 14px;
   border-top: 1px solid var(--border);
 }
+.library-toolbar {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+.library-toolbar .library-search {
+  flex: 1;
+}
+.library-fix-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
 .library-search {
   display: flex;
   align-items: center;

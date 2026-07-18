@@ -40,6 +40,25 @@ const AUTO_RETRY_MS = 15000;
  * count, together with the post-tick cooldown, keeps request volume low (§9). */
 const AUTO_MAX_SEEDS = 4;
 
+/** One credits lookup per videoId per session — streamed tracks get re-queued
+ * (auto-player, replays) and the answer never changes mid-session. A failed
+ * lookup is evicted so a transient network error can retry on the next add. */
+const creditsCache = new Map<
+  string,
+  Promise<{ track: string | null; artist: string | null } | null>
+>();
+function lookupCredits(videoId: string, videoTitle: string) {
+  let pending = creditsCache.get(videoId);
+  if (!pending) {
+    pending = api.musicCredits(videoId, videoTitle).catch(() => {
+      creditsCache.delete(videoId);
+      return null;
+    });
+    creditsCache.set(videoId, pending);
+  }
+  return pending;
+}
+
 /** Title fragments that mark a remix/edit re-upload we don't want as a suggestion. */
 const REMIX_MARKERS = [
   "slowed", "reverb", "sped up", "spedup", "nightcore", "8d", "lofi", "lo-fi",
@@ -226,6 +245,9 @@ interface PlayerState {
   playNow: (item: PlaybackItem) => Promise<void>;
   playOnce: (item: PlaybackItem) => Promise<void>;
   addToQueue: (item: PlaybackItem) => void;
+  /** Swap a streamed item's raw video title/channel for real music credits,
+   *  asynchronously, wherever the item appears (queue + one-off slot). */
+  _enrichStreamItem: (item: PlaybackItem) => void;
   togglePlay: () => void;
   next: () => void;
   prev: () => void;
@@ -319,6 +341,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       _autoCooldownUntil: 0,
       _autoRetryTimer: null,
     }));
+    for (const item of items) get()._enrichStreamItem(item);
     await get()._load();
   },
 
@@ -360,6 +383,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       _resumePosition: null,
       _consecutiveErrors: 0,
     });
+    get()._enrichStreamItem(item);
     await get()._load();
   },
 
@@ -394,6 +418,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       _autoCooldownUntil: 0,
       _autoRetryTimer: null,
     });
+    get()._enrichStreamItem(item);
     await get()._load();
   },
 
@@ -404,10 +429,32 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       // Keep the natural order in sync so un-shuffling preserves new songs.
       naturalOrder: s.naturalOrder ? [...s.naturalOrder, item.key] : null,
     }));
+    get()._enrichStreamItem(item);
     if (wasEmpty) {
       set({ index: 0 });
       void get()._load();
     }
+  },
+
+  _enrichStreamItem: (item) => {
+    // Library songs already carry credits (applied at download time); only
+    // streamed tracks show the raw video title / channel name.
+    if (item.songId || item.source.kind !== "stream") return;
+    void lookupCredits(item.videoId, item.title).then((credits) => {
+      if (!credits || (!credits.track && !credits.artist)) return;
+      const patch = (it: PlaybackItem) =>
+        it.videoId === item.videoId && !it.songId && it.source.kind === "stream"
+          ? {
+              ...it,
+              title: credits.track || it.title,
+              artist: credits.artist || it.artist,
+            }
+          : it;
+      set((s) => ({
+        queue: s.queue.map(patch),
+        oneOffItem: s.oneOffItem ? patch(s.oneOffItem) : s.oneOffItem,
+      }));
+    });
   },
 
   togglePlay: () => {

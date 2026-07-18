@@ -53,10 +53,26 @@ export async function ensureSongInLibrary(
       libraryDir,
       format,
     });
+    // Prefer YouTube's own music credits (real song title / real artist) over
+    // the raw video title and channel name. yt-dlp surfaces them for Topic
+    // audio uploads; for everything else ask the YouTube Music catalog. A
+    // failed lookup just falls back to the raw names — never fails the
+    // download.
+    let track = res.track;
+    let artist = res.artist;
+    if (!track || !artist) {
+      try {
+        const credits = await api.musicCredits(result.videoId, result.title);
+        track = track || credits.track;
+        artist = artist || credits.artist;
+      } catch (e) {
+        console.error("music credits lookup failed", result.videoId, e);
+      }
+    }
     const song: Song = {
       id: result.videoId,
-      title: result.title,
-      artist: result.artist,
+      title: track || result.title,
+      artist: artist || result.artist,
       durationSec: result.durationSec,
       videoId: result.videoId,
       url: result.url,
@@ -162,4 +178,41 @@ export async function saveQueueAsPlaylist(name: string): Promise<string | null> 
   // queue index), never from download-completion timing.
   useLibraryStore.getState().reorderPlaylist(playlist.id, orderedIds);
   return playlist.id;
+}
+
+const CREDITS_CONCURRENCY = 3;
+
+/**
+ * One-time cleanup for songs downloaded before credits capture existed: fetch
+ * YouTube's music credits for every library song (metadata only, no download)
+ * and overwrite title/artist where YouTube has real credits. Songs without
+ * credits, and per-song fetch failures, are left untouched.
+ */
+export async function refreshMusicCredits(
+  onProgress?: (done: number, total: number, updated: number) => void,
+): Promise<{ total: number; updated: number }> {
+  const songs = Object.values(useLibraryStore.getState().songs);
+  let done = 0;
+  let updated = 0;
+  await runPool(songs, CREDITS_CONCURRENCY, async (song) => {
+    try {
+      const credits = await api.musicCredits(song.videoId, song.title);
+      const patch: Partial<Song> = {};
+      if (credits.track && credits.track !== song.title) {
+        patch.title = credits.track;
+      }
+      if (credits.artist && credits.artist !== song.artist) {
+        patch.artist = credits.artist;
+      }
+      if (Object.keys(patch).length > 0) {
+        useLibraryStore.getState().updateSong(song.id, patch);
+        updated++;
+      }
+    } catch (e) {
+      console.error("music credits fetch failed", song.id, e);
+    }
+    done++;
+    onProgress?.(done, songs.length, updated);
+  });
+  return { total: songs.length, updated };
 }

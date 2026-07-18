@@ -21,6 +21,9 @@ pub struct SearchResult {
 pub struct DownloadResult {
     pub video_id: String,
     pub file_path: String,
+    /// YouTube's own music credits, when the video has them (None otherwise).
+    pub track: Option<String>,
+    pub artist: Option<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -295,6 +298,13 @@ pub async fn download_song(
         out_template,
         "--print".into(),
         "after_move:filepath".into(),
+        // YouTube's own music credits (the "Music in this video" section /
+        // auto-generated Topic metadata). yt-dlp prints the NA placeholder when
+        // a video has none; credit_value() maps that back to None.
+        "--print".into(),
+        format!("after_move:{CREDITS_TRACK_PREFIX}%(track)s"),
+        "--print".into(),
+        format!("after_move:{CREDITS_ARTIST_PREFIX}%(artist)s"),
     ];
     if let Some(loc) = ffmpeg_location(&app) {
         args.push("--ffmpeg-location".into());
@@ -311,6 +321,8 @@ pub async fn download_song(
         .map_err(|e| e.to_string())?;
 
     let mut file_path = String::new();
+    let mut track: Option<String> = None;
+    let mut artist: Option<String> = None;
     let mut stderr_buf = String::new();
     let mut exit_err: Option<String> = None;
 
@@ -331,6 +343,10 @@ pub async fn download_song(
                                 },
                             );
                         }
+                    } else if let Some(v) = line.strip_prefix(CREDITS_TRACK_PREFIX) {
+                        track = credit_value(v);
+                    } else if let Some(v) = line.strip_prefix(CREDITS_ARTIST_PREFIX) {
+                        artist = credit_value(v);
                     } else if !line.is_empty() && !line.starts_with('[') && looks_like_path(line) {
                         file_path = line.to_string();
                     }
@@ -393,7 +409,23 @@ pub async fn download_song(
     Ok(DownloadResult {
         video_id,
         file_path,
+        track,
+        artist,
     })
+}
+
+const CREDITS_TRACK_PREFIX: &str = "CREDITS-TRACK::";
+const CREDITS_ARTIST_PREFIX: &str = "CREDITS-ARTIST::";
+
+/// yt-dlp prints "NA" for fields a video doesn't have; map that (and empty
+/// strings) back to None so callers can fall back cleanly.
+fn credit_value(raw: &str) -> Option<String> {
+    let v = raw.trim();
+    if v.is_empty() || v == "NA" {
+        None
+    } else {
+        Some(v.to_string())
+    }
 }
 
 fn looks_like_path(line: &str) -> bool {

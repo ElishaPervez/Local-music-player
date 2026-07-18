@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Local Music Player — an honest review</title>
+<style>
+  :root{
+    --bg:#0e0d13; --panel:#17151f; --panel2:#1e1b28; --line:#2a2636;
+    --ink:#ece9f5; --muted:#a49fb8; --dim:#726c88;
+    --accent:#7c5cff; --accent2:#a98bff;
+    --good:#3ecf8e; --warn:#f0b429; --bad:#f0616e;
+    --radius:16px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:radial-gradient(1200px 700px at 80% -10%, #241d3d 0%, transparent 60%), var(--bg);
+    color:var(--ink);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1000px;margin:0 auto;padding:48px 24px 96px}
+  header.hero{
+    border:1px solid var(--line);border-radius:22px;padding:36px 34px;
+    background:linear-gradient(160deg,#1c1830,#141220);position:relative;overflow:hidden;
+  }
+  header.hero:before{
+    content:"";position:absolute;right:-60px;top:-60px;width:260px;height:260px;
+    background:radial-gradient(circle,var(--accent) 0%,transparent 70%);opacity:.28;
+  }
+  .eyebrow{letter-spacing:.14em;text-transform:uppercase;font-size:12px;color:var(--accent2);font-weight:700}
+  h1{font-size:34px;margin:.35em 0 .2em;line-height:1.15}
+  .sub{color:var(--muted);font-size:17px;max-width:70ch}
+  .verdict{
+    display:inline-flex;gap:10px;align-items:center;margin-top:22px;
+    background:var(--panel2);border:1px solid var(--line);border-radius:999px;
+    padding:9px 16px;font-size:14px;color:var(--muted)
+  }
+  .verdict b{color:var(--ink)}
+  h2{font-size:24px;margin:56px 0 6px;letter-spacing:-.01em}
+  h2 .n{color:var(--accent2);font-variant-numeric:tabular-nums;margin-right:10px}
+  .lede{color:var(--muted);margin:0 0 22px;max-width:78ch}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:22px 24px;margin:14px 0}
+  .card h3{margin:.1em 0 .4em;font-size:18px}
+  .card p{margin:.4em 0;color:var(--muted)}
+  .card p.take{color:var(--ink)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:720px){.grid2{grid-template-columns:1fr}.wrap{padding:32px 16px 72px}}
+  .pill{display:inline-block;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;vertical-align:middle}
+  .pill.good{background:rgba(62,207,142,.14);color:var(--good)}
+  .pill.warn{background:rgba(240,180,41,.14);color:var(--warn)}
+  .pill.bad{background:rgba(240,97,110,.14);color:var(--bad)}
+  .pill.neu{background:rgba(164,159,184,.14);color:var(--muted)}
+  /* comparison table */
+  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);margin:16px 0}
+  table{border-collapse:collapse;width:100%;min-width:640px;font-size:14.5px}
+  th,td{padding:13px 16px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+  thead th{background:var(--panel2);color:var(--muted);font-size:12.5px;text-transform:uppercase;letter-spacing:.06em}
+  tbody tr:last-child td{border-bottom:none}
+  td.feat{color:var(--ink);font-weight:600}
+  .yes{color:var(--good);font-weight:700}
+  .no{color:var(--bad);font-weight:700}
+  .part{color:var(--warn);font-weight:700}
+  small.note{display:block;color:var(--dim);font-weight:400;margin-top:2px;font-size:12.5px}
+  /* strengths / gaps lists */
+  .row{display:flex;gap:14px;align-items:flex-start;padding:14px 0;border-bottom:1px solid var(--line)}
+  .row:last-child{border-bottom:none}
+  .row .mark{flex:0 0 26px;height:26px;border-radius:8px;display:grid;place-items:center;font-weight:800;font-size:15px;margin-top:2px}
+  .mark.up{background:rgba(62,207,142,.15);color:var(--good)}
+  .mark.dn{background:rgba(240,97,110,.15);color:var(--bad)}
+  .row .body h4{margin:0 0 3px;font-size:16px}
+  .row .body p{margin:0;color:var(--muted);font-size:14.5px}
+  /* diagram */
+  .flow{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0 4px}
+  .node{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:13.5px}
+  .node b{display:block;color:var(--ink)}
+  .node span{color:var(--dim);font-size:12px}
+  .arrow{color:var(--accent2);font-size:20px}
+  .callout{border-left:3px solid var(--accent);background:var(--panel2);padding:14px 18px;border-radius:0 12px 12px 0;margin:16px 0}
+  .callout.warn{border-color:var(--warn)}
+  .callout.bad{border-color:var(--bad)}
+  .callout p{margin:.3em 0;color:var(--ink)}
+  .foot{margin-top:64px;color:var(--dim);font-size:13px;text-align:center;border-top:1px solid var(--line);padding-top:24px}
+  .who{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:16px 0}
+  @media(max-width:720px){.who{grid-template-columns:1fr}}
+  .who .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .who .box h4{margin:0 0 6px;font-size:15px}
+  .who .box p{margin:0;color:var(--muted);font-size:14px}
+  .scorebar{height:8px;border-radius:999px;background:var(--panel2);overflow:hidden;margin-top:8px}
+  .scorebar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  .scoregrid{display:grid;grid-template-columns:160px 1fr 46px;gap:10px 16px;align-items:center;margin-top:10px}
+  .scoregrid .lab{color:var(--muted);font-size:14px}
+  .scoregrid .val{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink);font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow">Honest review · v0.5.0</div>
+    <h1>Your Local Music Player, measured against<br>Spotify, YouTube & YT Music</h1>
+    <p class="sub">The short version: you've built a genuinely good <b>personal</b> music player with a few tricks the big apps don't bother with. Where it can't compete is the stuff that needs a company behind it — a music catalog you're licensed to use, sound quality guarantees, and your library following you between devices.</p>
+    <div class="verdict">🎧&nbsp; Verdict: <b>&nbsp;A polished tool for one person on one Windows PC — not a Spotify replacement, and it doesn't need to be.</b></div>
+  </header>
+
+  <!-- ─────────────────────────  WHAT IT ACTUALLY IS  ───────────────────────── -->
+  <h2><span class="n">01</span>What this app actually is</h2>
+  <p class="lede">Before comparing, it's worth being precise about the machine you've built, because it's a different <em>kind</em> of thing than the streaming services.</p>
+
+  <div class="flow">
+    <div class="node"><b>You type a song</b><span>name or YouTube link</span></div>
+    <span class="arrow">→</span>
+    <div class="node"><b>It searches YouTube</b><span>via a bundled downloader</span></div>
+    <span class="arrow">→</span>
+    <div class="node"><b>Play instantly</b><span>streamed, nothing saved</span></div>
+    <span class="arrow">or</span>
+    <div class="node"><b>Download to a playlist</b><span>yours forever, offline</span></div>
+  </div>
+
+  <div class="callout">
+    <p><b>The key difference from Spotify:</b> Spotify rents you access to a catalog — stop paying and the music is gone. Your app <b>copies the audio onto the user's own disk</b>. Once a song is in a playlist, it plays with no internet, no subscription, and no way for anyone to take it away. That is the whole point of it, and it's a real point.</p>
+  </div>
+
+  <!-- ─────────────────────────  SCORECARD  ───────────────────────── -->
+  <h2><span class="n">02</span>The scorecard</h2>
+  <p class="lede">How it stacks up on the things a person actually feels while using a music app. Scored against what the paid services deliver.</p>
+  <div class="card">
+    <div class="scoregrid">
+      <div class="lab">Core playback feel</div><div class="scorebar"><i style="width:90%"></i></div><div class="val">9/10</div>
+      <div class="lab">Features per screen</div><div class="scorebar"><i style="width:80%"></i></div><div class="val">8/10</div>
+      <div class="lab">Sound quality</div><div class="scorebar"><i style="width:55%"></i></div><div class="val">5.5/10</div>
+      <div class="lab">Music discovery</div><div class="scorebar"><i style="width:50%"></i></div><div class="val">5/10</div>
+      <div class="lab">"Just works" polish</div><div class="scorebar"><i style="width:65%"></i></div><div class="val">6.5/10</div>
+      <div class="lab">Follows you everywhere</div><div class="scorebar"><i style="width:8%"></i></div><div class="val">1/10</div>
+      <div class="lab">Safe & sustainable</div><div class="scorebar"><i style="width:30%"></i></div><div class="val">3/10</div>
+    </div>
+  </div>
+
+  <!-- ─────────────────────────  WHERE IT WINS  ───────────────────────── -->
+  <h2><span class="n">03</span>Where it genuinely beats the big apps</h2>
+  <p class="lede">These aren't participation trophies — each one is something Spotify or YT Music actively won't or can't give you.</p>
+
+  <div class="card">
+    <div class="row">
+      <div class="mark up">↑</div>
+      <div class="body">
+        <h4>You own the files, no subscription</h4>
+        <p>A downloaded playlist plays on a plane, in a dead-zone, or ten years from now after the app is abandoned. Cancel Spotify and your Liked Songs vanish that day — here nothing is rented.</p>
+      </div>
+    </div>
+    <div class="row">
+      <div class="mark up">↑</div>
+      <div class="body">
+        <h4>No ads, ever, and it's free</h4>
+        <p>Free Spotify interrupts you with ads and won't let you pick a song on your phone. YouTube shows video ads before songs. Your app has neither — every play is instant and uninterrupted.</p>
+      </div>
+    </div>
+    <div class="row">
+      <div class="mark up">↑</div>
+      <div class="body">
+        <h4>Crossfade that actually sounds right</h4>
+        <p>When one song ends the next rises in as the old one fades, using an equal-power blend so the music never dips in volume through the overlap. It even pre-loads the next track a few seconds early, so a streamed song starts the fade on time instead of stuttering. Spotify has crossfade; YouTube Music still doesn't.</p>
+      </div>
+    </div>
+    <div class="row">
+      <div class="mark up">↑</div>
+      <div class="body">
+        <h4>The whole of YouTube is your catalog</h4>
+        <p>Live bootlegs, a random SoundCloud-style upload, a 2009 fan remix, regional music the licensed services never cleared — if it's on YouTube, you can play or keep it. Spotify's catalog stops at what labels licensed.</p>
+      </div>
+    </div>
+    <div class="row">
+      <div class="mark up">↑</div>
+      <div class="body">
+        <h4>Small touches the big apps skip</h4>
+        <p>Play a song "just once" without wrecking your queue, then the queue picks up exactly where it was. A custom blurred background image. A Discord status showing what you're playing with a live progress bar. Drag-anywhere queue reordering. These are the kind of details a solo builder adds and a committee cuts.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─────────────────────────  WHERE IT LOSES  ───────────────────────── -->
+  <h2><span class="n">04</span>Where it can't keep up — and why</h2>
+  <p class="lede">Being honest: most of these aren't things you forgot to build. They're structural — they need a company, licensing deals, or servers you don't have.</p>
+
+  <div class="card">
+    <div class="row">
+      <div class="mark dn">↓</div>
+      <div class="body">
+        <h4>Sound quality is capped by what YouTube hands out <span class="pill warn">ceiling</span></h4>
+        <p>YouTube serves compressed audio — roughly 128 kbps AAC or Opus. Spotify pushes higher-bitrate streams and Apple Music / Tidal offer lossless. On cheap earbuds nobody hears it; on good headphones a careful listener will notice your tracks sound a touch flatter. You can't fix this — it's whatever YouTube decides to send.</p>
+      </div>
+    </div>
+    <div class="row">
+      <div class="mark dn">↓</div>
+      <div class="body">
+        <h4>Song info is messy, because it's really video titles <span class="pill warn">data quality</span></h4>
+        <p>The "artist" is whoever uploaded the video, and the title is the video's title — so you get things like <i>"Song Name (Official Music Video) [4K]"</i> and the artist reading as a random channel. Spotify shows clean artist, album, track number, and real cover art. Yours shows the YouTube thumbnail and the raw title. Fine for playing; ugly for a tidy library.</p>
+      </div>
+    </div>
+    <div class="row">
+      <div class="mark dn">↓</div>
+      <div class="body">
+        <h4>Your music does not follow you <span class="pill bad">structural</span></h4>
+        <p>Everything lives on one Windows PC. No phone app, no web player, no syncing your playlists to another machine. Close the laptop and the music stops — there's nothing in your pocket. This is the single biggest gap versus every streaming service, and closing it would mean building servers and accounts.</p>
+      </div>
+    </div>
+    <div class="row">
+      <div class="mark dn">↓</div>
+      <div class="body">
+        <h4>Discovery is "more like this," not "made for you" <span class="pill warn">shallow</span></h4>
+        <p>The auto-play radio is smart engineering — it keeps the music going by pulling YouTube's "up next" suggestions, filtering out remixes and songs you already have. But it's reacting to one seed song. Spotify's Discover Weekly and Daylist learn your taste across months and millions of other listeners. Yours can't build a taste profile — it has no idea what you loved last week.</p>
+      </div>
+    </div>
+    <div class="row">
+      <div class="mark dn">↓</div>
+      <div class="body">
+        <h4>It forgets everything when you close it <span class="pill bad">rough edge</span></h4>
+        <p>I checked the code: your library, playlists, and history are saved, but the <b>now-playing queue, the volume, and your spot in the song are not</b>. Reopen the app and you're back to a silent 80%-volume blank slate — the song you were halfway through is gone. Every serious player reopens right where you left off. This one's fully in your control to fix.</p>
+      </div>
+    </div>
+    <div class="row">
+      <div class="mark dn">↓</div>
+      <div class="body">
+        <h4>The keyboard's music buttons don't work <span class="pill warn">rough edge</span></h4>
+        <p>Pressing the play/pause key on a keyboard or headset does nothing, and the little media popup Windows shows for other players never appears for yours. So you can't pause from another app or the lock screen — you have to click back into the window. Also fixable by you, and it's the kind of thing users quietly expect.</p>
+      </div>
+    </div>
+    <div class="row">
+      <div class="mark dn">↓</div>
+      <div class="body">
+        <h4>Standing on legally shaky ground <span class="pill bad">risk</span></h4>
+        <p>Downloading audio from YouTube breaks YouTube's terms of service, and the tool it relies on gets blocked by YouTube from time to time — when that happens, search and playback simply stop working until the tool is updated. For personal use it's a grey area many people live in; but it means this can never become a real product you sell or list in an app store, and it can break out from under you on any given week.</p>
+      </div>
+    </div>
+    <div class="row">
+      <div class="mark dn">↓</div>
+      <div class="body">
+        <h4>No lyrics, no podcasts, no sharing, no social <span class="pill neu">out of scope</span></h4>
+        <p>Not criticisms so much as scope: the streaming services are entertainment platforms with lyrics scrolling in time, podcasts, shareable links, and collaborative playlists. Yours is a focused player. That focus is a feature — just know that's the trade.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─────────────────────────  FEATURE TABLE  ───────────────────────── -->
+  <h2><span class="n">05</span>Side by side</h2>
+  <p class="lede">A quick reference. <span class="yes">●</span> full &nbsp; <span class="part">◐</span> partial &nbsp; <span class="no">○</span> none.</p>
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>Feature</th><th>Your app</th><th>Spotify</th><th>YT Music</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="feat">Play offline, no subscription</td><td class="yes">●<small class="note">you own the file</small></td><td class="part">◐<small class="note">paid only, DRM-locked</small></td><td class="part">◐<small class="note">paid only</small></td></tr>
+        <tr><td class="feat">No ads</td><td class="yes">●</td><td class="part">◐<small class="note">free tier has ads</small></td><td class="part">◐<small class="note">free tier has ads</small></td></tr>
+        <tr><td class="feat">Crossfade between tracks</td><td class="yes">●</td><td class="yes">●</td><td class="no">○</td></tr>
+        <tr><td class="feat">Catalog breadth</td><td class="yes">●<small class="note">all of YouTube</small></td><td class="part">◐<small class="note">licensed only</small></td><td class="yes">●</td></tr>
+        <tr><td class="feat">Audio quality</td><td class="part">◐<small class="note">~128 kbps ceiling</small></td><td class="yes">●<small class="note">up to 320 / lossless</small></td><td class="yes">●<small class="note">up to 256 kbps</small></td></tr>
+        <tr><td class="feat">Clean artist / album / art</td><td class="no">○<small class="note">raw video titles</small></td><td class="yes">●</td><td class="yes">●</td></tr>
+        <tr><td class="feat">Personalized recommendations</td><td class="part">◐<small class="note">"more like this" only</small></td><td class="yes">●</td><td class="yes">●</td></tr>
+        <tr><td class="feat">Works on phone / other devices</td><td class="no">○<small class="note">one Windows PC</small></td><td class="yes">●</td><td class="yes">●</td></tr>
+        <tr><td class="feat">Playlists sync across devices</td><td class="no">○</td><td class="yes">●</td><td class="yes">●</td></tr>
+        <tr><td class="feat">Resume where you left off</td><td class="no">○<small class="note">queue not saved</small></td><td class="yes">●</td><td class="yes">●</td></tr>
+        <tr><td class="feat">Media keys / lock-screen control</td><td class="no">○</td><td class="yes">●</td><td class="yes">●</td></tr>
+        <tr><td class="feat">Lyrics</td><td class="no">○</td><td class="yes">●</td><td class="yes">●</td></tr>
+        <tr><td class="feat">Podcasts</td><td class="no">○</td><td class="yes">●</td><td class="no">○</td></tr>
+        <tr><td class="feat">On solid legal footing</td><td class="no">○<small class="note">breaks YouTube ToS</small></td><td class="yes">●</td><td class="yes">●</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ─────────────────────────  WHO IT'S FOR  ───────────────────────── -->
+  <h2><span class="n">06</span>Who it's actually for</h2>
+  <div class="who">
+    <div class="box"><h4>💚 Perfect for</h4><p>Someone at a desk who wants a free, ad-free, offline player for music that's already on YouTube — and likes owning the files rather than renting them.</p></div>
+    <div class="box"><h4>😐 Fine, with caveats</h4><p>A tinkerer who doesn't mind messy song titles and the occasional week where YouTube blocks the downloader until it's updated.</p></div>
+    <div class="box"><h4>❌ Wrong tool for</h4><p>Anyone who listens on their phone, wants lossless audio and clean metadata, or expects the app to learn their taste over time.</p></div>
+  </div>
+
+  <!-- ─────────────────────────  IF YOU WANT TO CLOSE THE GAP  ───────────────────────── -->
+  <h2><span class="n">07</span>The three fixes that would move the needle most</h2>
+  <p class="lede">Ranked by how much a real user would feel it, versus how much work it is. All three are yours to do — no company or licensing required.</p>
+  <div class="grid2">
+    <div class="card">
+      <h3>1. Remember where you left off <span class="pill good">high impact · low effort</span></h3>
+      <p class="take">Save the queue, volume, and playback position, and restore them on launch. This is the difference between "a demo I reopen from scratch" and "my music player." You already persist everything else — it's the same mechanism applied to the player state.</p>
+    </div>
+    <div class="card">
+      <h3>2. Wire up the media keys <span class="pill good">high impact · low effort</span></h3>
+      <p class="take">Make the keyboard/headset play-pause button work and show the standard Windows media popup. Users don't praise this when it works, but they immediately distrust a music app where it's missing.</p>
+    </div>
+    <div class="card">
+      <h3>3. Clean up the song titles <span class="pill warn">medium impact · medium effort</span></h3>
+      <p class="take">Strip the "(Official Video) [4K Remaster]" noise from titles and take a real guess at artist vs. song. Turns a scruffy list of video names into something that reads like an actual library.</p>
+    </div>
+    <div class="card">
+      <h3>Be honest about the ceiling <span class="pill neu">context</span></h3>
+      <p class="take">Audio quality, real personalized recommendations, and cross-device sync are not weekend fixes — they need YouTube to serve better audio (it won't), a recommendation engine trained on lots of listeners, and servers. It's fine to simply not compete there.</p>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <p><b>Bottom line:</b> As a piece of software this punches well above its weight — the playback engine, crossfade, and auto-radio are more carefully built than a lot of shipped apps. Its limits are almost entirely the ones a solo project on one PC can't escape: no licensed catalog, no servers, no phone. Judged as "a personal music player I built," it's a clear success. Judged as "a Spotify competitor," it was never going to be one — and trying to make it one is the wrong goal.</p>
+  </div>
+
+  <div class="foot">
+    Reviewed against the actual v0.5.0 source · Spotify, YouTube and YouTube Music feature sets as of early 2026.<br>
+    Scores are one reviewer's read of real-world feel, not benchmarks.
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,4 +1,5 @@
 mod commands;
+mod credits;
 mod discord;
 mod setup;
 mod ytdlp;
@@ -17,6 +18,7 @@ pub fn run() {
             ytdlp::related_mix,
             ytdlp::resolve_stream,
             ytdlp::download_song,
+            credits::music_credits,
             ytdlp::update_ytdlp,
             commands::default_library_dir,
             commands::delete_file,
