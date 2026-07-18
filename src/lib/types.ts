@@ -31,6 +31,9 @@ export type AudioFormat = "m4a" | "mp3" | "opus";
 
 export interface BackgroundConfig {
   path: string;
+  /** How to render the file. Absent on configs saved before video support —
+   *  callers fall back to deriving it from the file extension. */
+  kind?: "image" | "video";
   blur: number; // px
   opacity: number; // 0..1
 }

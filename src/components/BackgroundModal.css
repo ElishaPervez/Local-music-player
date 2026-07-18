@@ -32,6 +32,13 @@
   background-size: cover;
   background-position: center;
 }
+/* Video preview: replaced element, so size it explicitly and cover-crop it
+   (the parent's inset: -20px overscan = +40px on each axis). */
+video.bg-preview-img {
+  width: calc(100% + 40px);
+  height: calc(100% + 40px);
+  object-fit: cover;
+}
 .bg-preview-scrim {
   position: absolute;
   inset: 0;

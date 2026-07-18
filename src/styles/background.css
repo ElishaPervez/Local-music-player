@@ -7,6 +7,15 @@
   z-index: -2;
   pointer-events: none;
 }
+/* Live-wallpaper variant: a real <video>. background-size doesn't apply to a
+   replaced element, so cover it with object-fit and size it to the overscanned
+   box (inset: -40px → +80px each axis). WebView2 hardware-decodes and
+   GPU-composites this, so a muted looping clip is light on the CPU. */
+.app-bg-video {
+  width: calc(100% + 80px);
+  height: calc(100% + 80px);
+  object-fit: cover;
+}
 .app-bg-scrim {
   position: fixed;
   inset: 0;

@@ -4,6 +4,7 @@ import "./BackgroundModal.css";
 
 export default function BackgroundModal({
   previewSrc,
+  kind,
   initBlur,
   initOpacity,
   busy,
@@ -11,6 +12,7 @@ export default function BackgroundModal({
   onCancel,
 }: {
   previewSrc: string;
+  kind: "image" | "video";
   initBlur: number;
   initOpacity: number;
   busy?: boolean;
@@ -20,6 +22,7 @@ export default function BackgroundModal({
   const [blur, setBlur] = useState(initBlur);
   const [opacity, setOpacity] = useState(initOpacity);
   const aspect = `${window.innerWidth} / ${window.innerHeight}`;
+  const previewStyle: CSSProperties = { filter: `blur(${blur}px)`, opacity };
 
   return (
     <div className="picker-overlay" onClick={onCancel}>
@@ -32,14 +35,22 @@ export default function BackgroundModal({
         </div>
 
         <div className="bg-preview" style={{ aspectRatio: aspect }}>
-          <div
-            className="bg-preview-img"
-            style={{
-              backgroundImage: `url("${previewSrc}")`,
-              filter: `blur(${blur}px)`,
-              opacity,
-            }}
-          />
+          {kind === "video" ? (
+            <video
+              className="bg-preview-img"
+              src={previewSrc}
+              style={previewStyle}
+              autoPlay
+              loop
+              muted
+              playsInline
+            />
+          ) : (
+            <div
+              className="bg-preview-img"
+              style={{ ...previewStyle, backgroundImage: `url("${previewSrc}")` }}
+            />
+          )}
           <div className="bg-preview-scrim" />
           <div className="bg-preview-ui">
             <span className="bg-preview-chip">Library preview</span>

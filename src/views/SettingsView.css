@@ -79,6 +79,11 @@
   background-position: center;
   flex-shrink: 0;
 }
+/* A video thumbnail shows its first frame (preload="metadata"), cover-cropped. */
+video.bg-thumb {
+  object-fit: cover;
+  background: #000;
+}
 
 .format-toggle {
   display: flex;

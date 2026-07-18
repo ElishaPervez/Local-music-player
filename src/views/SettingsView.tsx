@@ -15,6 +15,13 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import { api, fileSrc, type ToolsStatus } from "../lib/api";
 import { useLibraryStore } from "../stores/libraryStore";
 import type { AudioFormat } from "../lib/types";
+import {
+  IMAGE_EXTS,
+  VIDEO_EXTS,
+  extOf,
+  bgKind,
+  bgKindFromPath,
+} from "../lib/background";
 import BackgroundModal from "../components/BackgroundModal";
 import LibraryPanel from "./settings/LibraryPanel";
 import "./views.css";
@@ -92,9 +99,11 @@ export default function SettingsView() {
     const picked = await open({
       filters: [
         {
-          name: "Images",
-          extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp", "jfif"],
+          name: "Images & live wallpapers",
+          extensions: [...IMAGE_EXTS, ...VIDEO_EXTS],
         },
+        { name: "Live wallpapers (video)", extensions: VIDEO_EXTS },
+        { name: "Images", extensions: IMAGE_EXTS },
       ],
     });
     if (typeof picked === "string") setBgModal({ src: picked, imported: false });
@@ -104,21 +113,35 @@ export default function SettingsView() {
     if (!bgModal) return;
     setBgBusy(true);
     try {
+      const prevPath = settings.background?.path;
       let path = bgModal.src;
       if (!bgModal.imported) {
-        const ext = (bgModal.src.split(".").pop() || "jpg").toLowerCase();
+        const ext = extOf(bgModal.src) || "jpg";
         path = await api.importBackground(
           bgModal.src,
           `${crypto.randomUUID()}.${ext}`,
         );
+        // Drop the previous copy from appdata so replaced wallpapers (videos
+        // can be hundreds of MB) don't pile up. Only when it actually changed.
+        if (prevPath && prevPath !== path) {
+          await api.deleteFile(prevPath).catch(() => {});
+        }
       }
-      setSettings({ background: { path, blur, opacity } });
+      setSettings({
+        background: { path, kind: bgKindFromPath(path), blur, opacity },
+      });
       setBgModal(null);
     } catch (e) {
       console.error("background import failed", e);
     } finally {
       setBgBusy(false);
     }
+  }
+
+  async function removeBackground() {
+    const path = settings.background?.path;
+    setSettings({ background: null });
+    if (path) await api.deleteFile(path).catch(() => {});
   }
 
   return (
@@ -246,18 +269,31 @@ export default function SettingsView() {
               <ImageIcon size={18} />
               <div>
                 <strong>Background</strong>
-                <p>Custom image behind the app, with blur &amp; opacity</p>
+                <p>
+                  Image or live wallpaper (video) behind the app, with blur
+                  &amp; opacity
+                </p>
               </div>
             </div>
             <div className="setting-actions">
               {settings.background ? (
                 <>
-                  <div
-                    className="bg-thumb"
-                    style={{
-                      backgroundImage: `url("${fileSrc(settings.background.path)}")`,
-                    }}
-                  />
+                  {bgKind(settings.background) === "video" ? (
+                    <video
+                      className="bg-thumb"
+                      src={fileSrc(settings.background.path)}
+                      muted
+                      playsInline
+                      preload="metadata"
+                    />
+                  ) : (
+                    <div
+                      className="bg-thumb"
+                      style={{
+                        backgroundImage: `url("${fileSrc(settings.background.path)}")`,
+                      }}
+                    />
+                  )}
                   <button
                     className="btn-secondary"
                     onClick={() =>
@@ -267,16 +303,13 @@ export default function SettingsView() {
                   >
                     Adjust
                   </button>
-                  <button
-                    className="btn-secondary"
-                    onClick={() => setSettings({ background: null })}
-                  >
+                  <button className="btn-secondary" onClick={removeBackground}>
                     Remove
                   </button>
                 </>
               ) : (
                 <button className="btn-secondary" onClick={pickBackground}>
-                  Add image…
+                  Add…
                 </button>
               )}
             </div>
@@ -374,6 +407,7 @@ export default function SettingsView() {
       {bgModal && (
         <BackgroundModal
           previewSrc={fileSrc(bgModal.src)}
+          kind={bgKindFromPath(bgModal.src)}
           initBlur={settings.background?.blur ?? 6}
           initOpacity={settings.background?.opacity ?? 0.45}
           busy={bgBusy}

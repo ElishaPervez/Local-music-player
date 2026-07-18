@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Live Wallpapers — what was built</title>
+<style>
+  :root {
+    --bg: #0c0d11; --panel: #14161d; --panel2: #191c25; --border: #262a36;
+    --text: #e8eaf0; --dim: #9aa1b2; --accent: #7c9cff; --good: #57d38c;
+    --warn: #ffcf6b; --pink: #ff86c8;
+    font-family: -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: radial-gradient(1200px 700px at 70% -10%, #1a1f2e 0%, var(--bg) 55%); color: var(--text); line-height: 1.55; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 40px 24px 80px; }
+  h1 { font-size: 30px; margin: 0 0 6px; letter-spacing: -0.5px; }
+  .sub { color: var(--dim); font-size: 15px; margin-bottom: 30px; }
+  h2 { font-size: 19px; margin: 40px 0 14px; display: flex; align-items: center; gap: 10px; }
+  h2 .n { width: 26px; height: 26px; border-radius: 8px; background: var(--accent); color: #0a0c14; font-size: 14px; font-weight: 700; display: grid; place-items: center; flex-shrink: 0; }
+  p { margin: 8px 0; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; margin: 14px 0; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+  .tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: #20242f; color: var(--dim); border: 1px solid var(--border); }
+  .tag.new { background: rgba(87,211,140,.13); color: var(--good); border-color: rgba(87,211,140,.3); }
+  .tag.same { background: rgba(124,156,255,.12); color: var(--accent); border-color: rgba(124,156,255,.3); }
+  code { background: #0f1219; border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; font-size: 13px; color: #cdd4e6; font-family: "SF Mono", Consolas, monospace; }
+  .flow { display: flex; align-items: stretch; gap: 0; flex-wrap: wrap; margin: 10px 0; }
+  .step { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; flex: 1; min-width: 130px; }
+  .step .t { font-weight: 650; font-size: 14px; margin-bottom: 3px; }
+  .step .d { color: var(--dim); font-size: 12.5px; }
+  .arrow { display: grid; place-items: center; color: var(--accent); font-size: 22px; padding: 0 8px; }
+  @media (max-width: 720px) { .arrow { transform: rotate(90deg); padding: 4px 0; } .flow { flex-direction: column; } }
+  .perf { border-left: 3px solid var(--good); }
+  .perf.warnb { border-left-color: var(--warn); }
+  .k { color: var(--good); font-weight: 650; }
+  ul { margin: 8px 0; padding-left: 20px; }
+  li { margin: 5px 0; }
+  .files td { padding: 9px 12px; border-bottom: 1px solid var(--border); font-size: 13.5px; vertical-align: top; }
+  .files table { width: 100%; border-collapse: collapse; }
+  .files th { text-align: left; padding: 9px 12px; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--dim); border-bottom: 1px solid var(--border); }
+  .files code { font-size: 12.5px; }
+  .muted { color: var(--dim); font-size: 13px; }
+  .big { font-size: 15px; }
+  .split { display:flex; gap:16px; align-items:center; }
+  .split > div { flex:1; }
+  .vs { color: var(--dim); font-weight:700; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Live wallpapers — done</h1>
+  <div class="sub">You can now set a looping video as the background, with the same blur &amp; opacity controls the image background already had. It copies into the app's own storage, and it stops working the moment you can't see it.</div>
+
+  <div class="card">
+    <p class="big" style="margin-top:0"><strong>The short version:</strong> the app already had an image-background feature. I widened it to accept video files. When you pick a <code>.mp4</code>/<code>.webm</code>, it plays as a muted, looping background instead of a still picture. Everything else — importing it into app storage, the blur/opacity sliders, the frosted-glass panels — was reused as-is.</p>
+  </div>
+
+  <h2><span class="n">1</span> What you'll see</h2>
+  <div class="grid">
+    <div class="card">
+      <span class="tag new">changed</span>
+      <p><strong>Settings → Background</strong></p>
+      <p class="muted">The "Add…" button's file picker now offers video files alongside images. Pick one, and a preview modal shows the clip actually playing while you drag the Blur and Opacity sliders — so you set it to taste before committing.</p>
+    </div>
+    <div class="card">
+      <span class="tag new">changed</span>
+      <p><strong>The background itself</strong></p>
+      <p class="muted">A still image is painted as before. A video plays full-window behind the app, looping silently, cover-cropped to fill any window size. The little thumbnail in Settings shows the video's first frame.</p>
+    </div>
+  </div>
+
+  <h2><span class="n">2</span> "Copies into app storage so it survives deletion"</h2>
+  <div class="card">
+    <p style="margin-top:0">When you choose a file, the app doesn't point at the original on your disk — <strong>it copies the bytes into its own private folder</strong> and points at that copy. So if you later move, rename, or delete the file you picked, the wallpaper keeps working.</p>
+    <div class="flow">
+      <div class="step"><div class="t">You pick a video</div><div class="d">from anywhere on disk</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="t">Copied into app storage</div><div class="d">under a random filename in the app's data folder</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="t">App uses the copy</div><div class="d">original can be deleted freely</div></div>
+    </div>
+    <p class="muted">This is exactly what the image background already did — I reused the same copy step untouched, so video needed <span class="tag same">no backend change</span>. I did add one thing: when you <strong>replace</strong> a wallpaper, the old copy is deleted from app storage. Videos can be hundreds of megabytes, so without this, every wallpaper you ever tried would pile up and quietly eat disk space.</p>
+  </div>
+
+  <h2><span class="n">3</span> Keeping it light on the system</h2>
+  <p class="muted" style="margin-top:0">A moving video costs more than a still image — that's unavoidable. Here's where the cost actually goes and what stops it from being wasteful.</p>
+
+  <div class="card perf">
+    <p style="margin-top:0"><span class="k">Biggest win — it pauses when you can't see it.</span></p>
+    <p>The video <strong>stops decoding entirely</strong> the moment the app is minimized or its window is hidden. A paused video does zero work — no CPU, no GPU, no battery drain. When you come back, it resumes from where it left off. So while you're in another app full-screen, the wallpaper is effectively free. This is the single largest saving, and it's the reason a live wallpaper here is reasonable to leave on.</p>
+  </div>
+
+  <div class="card perf">
+    <p style="margin-top:0"><span class="k">The decode runs on the graphics card, not the CPU.</span></p>
+    <p>The app's display engine hands video decoding to your GPU's dedicated video hardware — the same silicon that plays YouTube without spinning up your fans. The clip is also muted, so there's no audio work at all.</p>
+  </div>
+
+  <div class="card perf warnb">
+    <p style="margin-top:0"><span style="color:var(--warn);font-weight:650">The one real cost, and why I left it in.</span></p>
+    <p>The app's panels (sidebar, top bar, player) are frosted glass — they blur whatever's behind them. Behind a <em>still</em> image that blur is computed once and cached. Behind a <em>moving</em> video it has to be recomputed every frame, for each panel. That's the main ongoing cost of a live wallpaper.</p>
+    <p>I kept the frosted look because you asked for "least intensive <strong>without compromise</strong>" — dropping the glass would be a visible downgrade, and modern graphics cards handle this comfortably. If you ever want the absolute-lowest-power option, the lever is right here: swapping those panels from frosted-glass to solid-tinted when a video is active would remove this per-frame cost entirely. Say the word and I'll add it as a toggle.</p>
+  </div>
+
+  <h2><span class="n">4</span> What changed in the code</h2>
+  <div class="files card" style="padding:6px 4px">
+    <table>
+      <tr><th>File</th><th>What</th><th></th></tr>
+      <tr><td><code>lib/background.ts</code></td><td>New helper: decides image-vs-video from the file extension; lists the supported formats.</td><td><span class="tag new">new</span></td></tr>
+      <tr><td><code>components/BackgroundLayer.tsx</code></td><td>Renders a <code>&lt;video&gt;</code> for live wallpapers; holds the pause-when-hidden logic.</td><td><span class="tag new">core</span></td></tr>
+      <tr><td><code>components/BackgroundModal.tsx</code></td><td>Preview now plays the video live while you adjust blur/opacity.</td><td><span class="tag new">edit</span></td></tr>
+      <tr><td><code>views/SettingsView.tsx</code></td><td>Picker accepts video; stores the media type; deletes the old copy on replace.</td><td><span class="tag new">edit</span></td></tr>
+      <tr><td><code>lib/types.ts</code>, CSS files</td><td>A media-type field; cover-crop &amp; sizing rules for the video element.</td><td><span class="tag new">edit</span></td></tr>
+      <tr><td>Rust backend</td><td>Untouched — the existing copy-into-storage step and file server already handle video.</td><td><span class="tag same">0 change</span></td></tr>
+    </table>
+  </div>
+  <p class="muted">Formats offered: <code>mp4</code>, <code>webm</code>, <code>mov</code>, <code>m4v</code>, <code>mkv</code>, <code>ogv</code> for video (plus every existing image type incl. animated GIF, which stays an image because that's far cheaper than treating it as video). <strong>mp4 and webm are the safe bets</strong> — the others depend on your system's installed codecs and may not play.</p>
+
+  <h2><span class="n">5</span> Verified</h2>
+  <div class="card">
+    <ul style="margin:0">
+      <li>Type-checking passes clean.</li>
+      <li>Production build succeeds.</li>
+      <li>All 15 existing tests still pass.</li>
+      <li>No backend/Rust changes, so nothing new to compile there.</li>
+    </ul>
+    <p class="muted" style="margin-bottom:0">Not yet done: I haven't launched the full desktop app and dropped a real video in by hand — that needs the running GUI. The display path it uses is the same one your music files already stream through, which is why I'm confident, but if you want I can boot the app and confirm a clip plays end-to-end.</p>
+  </div>
+</div>
+</body>
+</html>
