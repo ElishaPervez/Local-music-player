@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Auto-Player — Feature Scoping & Approach Decision</title>
+<style>
+  :root{
+    --bg:#0d0b16; --bg2:#141022; --panel:#191428; --panel2:#1f1834;
+    --line:#2c2442; --ink:#e8e4f5; --muted:#9b91bd; --dim:#6f6790;
+    --accent:#7c5cff; --accent2:#a98bff; --accent-soft:#2a2050;
+    --blocker:#ff5c7a; --major:#ff9d4d; --minor:#ffd24d; --info:#5cc8ff;
+    --good:#54e0a8; --bad:#ff6b8a;
+    --shadow:0 8px 30px rgba(0,0,0,.45);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;background:radial-gradient(1200px 600px at 80% -10%,#1c1330 0%,var(--bg) 55%);
+    color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--accent2);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 24px 100px}
+  header.hero{
+    padding:54px 24px 30px;max-width:1180px;margin:0 auto;
+  }
+  .kicker{letter-spacing:.18em;text-transform:uppercase;color:var(--accent2);font-size:12px;font-weight:700}
+  h1{font-size:34px;line-height:1.12;margin:10px 0 8px;letter-spacing:-.02em}
+  h1 .grad{background:linear-gradient(90deg,#a98bff,#7c5cff 60%,#5cc8ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{color:var(--muted);max-width:760px;font-size:16px}
+
+  nav.toc{
+    position:sticky;top:0;z-index:40;backdrop-filter:blur(10px);
+    background:rgba(13,11,22,.82);border-bottom:1px solid var(--line);
+    margin-top:18px;
+  }
+  nav.toc .inner{max-width:1180px;margin:0 auto;padding:11px 24px;display:flex;gap:8px;flex-wrap:wrap}
+  nav.toc a{font-size:12.5px;color:var(--muted);padding:5px 11px;border-radius:999px;border:1px solid transparent}
+  nav.toc a:hover{color:var(--ink);border-color:var(--line);background:var(--panel);text-decoration:none}
+
+  section{margin-top:48px;scroll-margin-top:64px}
+  h2{font-size:23px;margin:0 0 6px;letter-spacing:-.01em;display:flex;align-items:center;gap:10px}
+  h2 .num{font-size:13px;color:var(--accent2);border:1px solid var(--accent-soft);background:var(--accent-soft);
+    width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;flex:none}
+  .lead{color:var(--muted);max-width:840px;margin:0 0 18px}
+
+  .card{background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:14px;padding:20px 22px;box-shadow:var(--shadow)}
+  .grid{display:grid;gap:16px}
+  .g2{grid-template-columns:1fr 1fr}
+  @media(max-width:860px){.g2{grid-template-columns:1fr}}
+
+  .callout{border-left:3px solid var(--accent);background:var(--accent-soft);border-radius:10px;padding:14px 18px;margin:14px 0}
+  .callout.q{border-left-color:var(--blocker);background:rgba(255,92,122,.08)}
+  .callout strong{color:var(--accent2)}
+
+  .badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.04em;
+    text-transform:uppercase;padding:3px 9px;border-radius:999px;line-height:1.4;white-space:nowrap}
+  .b-blocker{color:#fff;background:linear-gradient(90deg,#ff3d63,#ff5c7a)}
+  .b-major{color:#1a1206;background:linear-gradient(90deg,#ff9d4d,#ffb86b)}
+  .b-minor{color:#231c00;background:linear-gradient(90deg,#ffd24d,#ffe082)}
+  .b-info{color:#03222e;background:linear-gradient(90deg,#5cc8ff,#7ad6ff)}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+
+  .subsys{border:1px solid var(--line);border-radius:13px;margin-bottom:16px;overflow:hidden;background:var(--panel)}
+  details>summary{list-style:none;cursor:pointer;padding:16px 20px;display:flex;align-items:center;gap:14px;
+    background:linear-gradient(180deg,var(--panel2),var(--panel));user-select:none}
+  details>summary::-webkit-details-marker{display:none}
+  .chev{transition:transform .18s ease;color:var(--accent2);flex:none}
+  details[open] .chev{transform:rotate(90deg)}
+  .subsys-title{font-weight:650;font-size:15.5px;flex:1;min-width:0}
+  .sev-strip{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .sev-count{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+  .sev-count b{color:var(--ink)}
+
+  .finding{border-top:1px solid var(--line);padding:16px 20px}
+  .finding:first-of-type{border-top:1px solid var(--line)}
+  .f-head{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
+  .f-area{font-weight:600;font-size:14.5px;flex:1;min-width:220px}
+  .f-file{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:var(--accent2);
+    background:#0c0a16;border:1px solid var(--line);border-radius:6px;padding:3px 8px;margin-top:8px;display:inline-block;word-break:break-word}
+  .f-body{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px}
+  @media(max-width:780px){.f-body{grid-template-columns:1fr}}
+  .f-cell h5{margin:0 0 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+  .f-cell.impact h5{color:var(--accent2)}
+  .f-cell p{margin:0;font-size:13.5px;color:var(--muted)}
+  .f-cell.impact p{color:var(--ink)}
+
+  .blockers-rail{background:linear-gradient(180deg,rgba(255,61,99,.10),rgba(255,61,99,.02));
+    border:1px solid rgba(255,92,122,.35);border-radius:14px;padding:18px 20px;margin-bottom:22px}
+  .blockers-rail h3{margin:0 0 4px;font-size:16px;color:#ff8fa3;display:flex;align-items:center;gap:8px}
+  .blockers-rail ul{margin:10px 0 0;padding:0;list-style:none;display:grid;gap:8px}
+  .blockers-rail li{display:flex;gap:10px;align-items:flex-start;font-size:13.5px}
+  .blockers-rail li .b-blocker{margin-top:1px}
+  .blockers-rail .where{font-family:ui-monospace,monospace;font-size:11.5px;color:var(--dim)}
+
+  /* diagram */
+  .flow{background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:22px;overflow-x:auto}
+  .flow svg{display:block;min-width:880px;margin:0 auto}
+
+  /* approaches */
+  .appcard{position:relative;overflow:hidden}
+  .appcard::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent2),transparent)}
+  .app-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap}
+  .app-name{font-size:18px;font-weight:700;letter-spacing:-.01em;margin:0}
+  .app-oneliner{color:var(--muted);font-size:13.5px;margin:8px 0 0;max-width:760px}
+  .pill-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .pill{font-size:11px;font-weight:700;border:1px solid var(--line);border-radius:999px;padding:4px 10px;color:var(--muted)}
+  .pill b{color:var(--ink)}
+  .eff{font-weight:800}
+  .eff-L{color:var(--good)}.eff-M{color:var(--minor)}.eff-XL{color:var(--blocker)}
+  .app-section{margin-top:16px}
+  .app-section h4{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent2);margin:0 0 6px}
+  .app-section p{margin:0;font-size:13.5px;color:var(--muted)}
+  .mono-snip{font-family:ui-monospace,monospace;font-size:12px;background:#0c0a16;border:1px solid var(--line);
+    border-radius:8px;padding:10px 12px;color:#c9c0ec;overflow-x:auto;white-space:pre-wrap;word-break:break-word}
+  .proscons{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+  @media(max-width:780px){.proscons{grid-template-columns:1fr}}
+  .pc{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:#130f22}
+  .pc h4{margin:0 0 8px}
+  .pc.pros h4{color:var(--good)}.pc.cons h4{color:var(--bad)}
+  .pc ul{margin:0;padding-left:0;list-style:none;display:grid;gap:7px}
+  .pc li{font-size:12.8px;color:var(--muted);padding-left:18px;position:relative;line-height:1.45}
+  .pc.pros li::before{content:"+";position:absolute;left:2px;color:var(--good);font-weight:800}
+  .pc.cons li::before{content:"\2013";position:absolute;left:2px;color:var(--bad);font-weight:800}
+  .meta-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+  @media(max-width:780px){.meta-row{grid-template-columns:1fr}}
+  .meta-row .pc h4{color:var(--accent2)}
+  .deps li{padding-left:16px}
+  .deps li::before{content:"\25C6";position:absolute;left:0;color:var(--accent);font-size:9px;top:4px}
+
+  /* matrix */
+  .matrix-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+  table.matrix{border-collapse:collapse;width:100%;min-width:900px;font-size:12.8px}
+  table.matrix th,table.matrix td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  table.matrix thead th{position:sticky;top:0;background:var(--panel2);z-index:2;font-size:12px;letter-spacing:.03em}
+  table.matrix thead th:first-child{border-top-left-radius:14px}
+  table.matrix tbody th{font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;font-size:10.5px;
+    background:var(--bg2);white-space:nowrap;position:sticky;left:0;z-index:1}
+  table.matrix td{color:var(--muted)}
+  table.matrix td b{color:var(--ink)}
+  table.matrix .apphdr{color:var(--ink);font-weight:700;font-size:13px}
+  table.matrix .apphdr small{display:block;color:var(--dim);font-weight:500;font-size:10.5px;margin-top:3px;text-transform:none;letter-spacing:0}
+  .tick-good{color:var(--good);font-weight:700}
+  .tick-bad{color:var(--bad);font-weight:700}
+  .tick-mid{color:var(--minor);font-weight:700}
+
+  /* decisions */
+  .decision{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:14px;overflow:hidden}
+  .decision summary{padding:15px 18px;display:flex;gap:12px;align-items:center;cursor:pointer;font-weight:600}
+  .decision summary .qn{flex:none;width:26px;height:26px;border-radius:8px;background:var(--accent-soft);color:var(--accent2);
+    display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:800}
+  .decision .qbody{padding:0 18px 16px 56px;color:var(--muted);font-size:13.5px}
+  .decision .qbody .opts{margin:10px 0 0;display:grid;gap:6px}
+  .decision .qbody .opt{display:flex;gap:8px;font-size:13px}
+  .decision .qbody .opt b{color:var(--accent2);flex:none}
+  .tag-srcs{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .tag-srcs span{font-size:10.5px;color:var(--dim);border:1px solid var(--line);border-radius:6px;padding:2px 7px;font-family:ui-monospace,monospace}
+
+  footer{margin-top:60px;border-top:1px solid var(--line);padding-top:22px;color:var(--dim);font-size:12.5px}
+  .note{font-size:12px;color:var(--dim);margin-top:8px}
+  code.inl{font-family:ui-monospace,monospace;font-size:12px;background:#0c0a16;border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:#c9c0ec}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="kicker">Feature Scoping &amp; Decision Aid</div>
+  <h1>Auto-Player: <span class="grad">an ephemeral "keep playing similar songs" radio</span></h1>
+  <p class="sub">A scope of the proposed auto-player, the subsystems it collides with, and five candidate ways to answer the one question the feature stands or falls on: <strong>how do you decide what "similar" is, and where do you get those songs?</strong> No winner is picked here — the choice is yours.</p>
+</header>
+
+<nav class="toc">
+  <div class="inner">
+    <a href="#frame">Framing</a>
+    <a href="#flow">Data flow</a>
+    <a href="#conflicts">Affected areas &amp; conflicts</a>
+    <a href="#approaches">Approaches</a>
+    <a href="#matrix">Comparison matrix</a>
+    <a href="#decisions">Decisions needed</a>
+  </div>
+</nav>
+
+<div class="wrap">
+
+<!-- ============ FRAMING ============ -->
+<section id="frame">
+  <h2><span class="num">1</span> What the feature is, and the unsolved part</h2>
+  <p class="lead">The request, verbatim and then distilled into the one thing nobody has cracked yet.</p>
+
+  <div class="card">
+    <div class="callout">
+      <strong>The request:</strong> An "auto player" that, when turned <em>on</em>, automatically keeps appending <em>similar</em> songs to the playlist as you listen — <strong>streamed ephemerally, never downloaded</strong>. The hard part the user can't figure out: <strong>how to FIND these "similar" songs.</strong> "Similar" does <em>not</em> mean remixes — not "reverbed" or "slowed + reverb" versions of the same song. It means similar in <strong>genre / mood / artist style</strong>. The user is unsure how similarity should even be defined or detected.
+    </div>
+
+    <div class="grid g2" style="margin-top:6px">
+      <div>
+        <h4 style="color:var(--accent2);font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin:0 0 8px">What already works in your favor</h4>
+        <p style="color:var(--muted);font-size:13.5px;margin:0">
+          The queue already holds <em>ephemeral stream items</em> (<code class="inl">source.kind:"stream"</code>) with lazy URL resolution via <code class="inl">yt-dlp&nbsp;-g</code>. <code class="inl">resultToStreamItem</code> + <code class="inl">addToQueue</code> are the exact shape an auto-appended track takes — <strong>no new data model, no new playback machinery, no download path</strong>. Ephemeral teardown is free (drop from the array). Settings persistence is forward-compatible, so an on/off flag is safe to add.
+        </p>
+      </div>
+      <div>
+        <h4 style="color:var(--blocker);font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin:0 0 8px">The core unsolved question</h4>
+        <p style="color:var(--ink);font-size:13.5px;margin:0">
+          There is <strong>zero similarity-bearing data anywhere</strong> in the app. <code class="inl">Song</code> and <code class="inl">SearchResult</code> carry only title/artist/duration/thumbnail — no genre, mood, tags, BPM, or embeddings. Worse, the one "artist"-looking field is really the YouTube <em>uploader/channel</em> (often "T-Series", "…- Topic", a random re-uploader). The only discovery primitive is a free-text <code class="inl">ytsearch20</code>, and searching by title/artist surfaces <em>exactly</em> the slowed+reverb remixes the user wants to avoid. There is <strong>no <code class="inl">related</code> / radio / recommendation backend command at all.</strong>
+        </p>
+      </div>
+    </div>
+    <p class="note">Every approach below is, at heart, a different answer to: <em>where does the "similar" signal come from</em> (YouTube's own mix graph, an external metadata graph, local string heuristics, the audio waveform itself, or an LLM's cultural map) — and how it avoids the remix trap.</p>
+  </div>
+</section>
+
+<!-- ============ DATA FLOW ============ -->
+<section id="flow">
+  <h2><span class="num">2</span> How an auto-appended ephemeral song travels</h2>
+  <p class="lead">Same skeleton for every approach: a low-water trigger fires discovery, candidates are de-duped and remix-filtered, survivors become ephemeral stream items appended to the live queue. Only the green "discovery" box differs per approach.</p>
+
+  <div class="flow">
+    <svg viewBox="0 0 940 430" role="img" aria-label="Auto-player data flow diagram">
+      <defs>
+        <marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+          <path d="M0,0 L8,3 L0,6 Z" fill="#7c5cff"/>
+        </marker>
+        <marker id="arrR" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+          <path d="M0,0 L8,3 L0,6 Z" fill="#ff9d4d"/>
+        </marker>
+        <linearGradient id="gdisc" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#173a2c"/><stop offset="1" stop-color="#0f2a20"/>
+        </linearGradient>
+        <linearGradient id="gbox" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#211a38"/><stop offset="1" stop-color="#191428"/>
+        </linearGradient>
+        <style>
+          .bx{fill:url(#gbox);stroke:#2c2442;stroke-width:1.2;rx:11}
+          .lbl{fill:#e8e4f5;font:600 13px -apple-system,Segoe UI,sans-serif}
+          .sub{fill:#9b91bd;font:11px ui-monospace,monospace}
+          .step{fill:#a98bff;font:700 11px -apple-system,sans-serif}
+          .ln{stroke:#7c5cff;stroke-width:1.8;fill:none}
+          .lnR{stroke:#ff9d4d;stroke-width:1.6;fill:none;stroke-dasharray:5 4}
+        </style>
+      </defs>
+
+      <!-- Row 1: playing -> trigger -> discovery -->
+      <rect class="bx" x="20" y="30" width="190" height="78" rx="11"/>
+      <text class="step" x="34" y="52">① SONG PLAYING</text>
+      <text class="lbl" x="34" y="72">current() stream item</text>
+      <text class="sub" x="34" y="90">videoId · title · artist</text>
+
+      <rect class="bx" x="270" y="30" width="200" height="78" rx="11"/>
+      <text class="step" x="284" y="52">② LOW-WATER TRIGGER</text>
+      <text class="lbl" x="284" y="72">_onTime tick</text>
+      <text class="sub" x="284" y="90">unplayed ahead &lt; N → fire</text>
+
+      <rect x="530" y="22" width="390" height="94" rx="11" fill="url(#gdisc)" stroke="#2e6e52" stroke-width="1.4"/>
+      <text class="step" x="546" y="44" fill="#54e0a8">③ DISCOVERY  (varies per approach)</text>
+      <text class="lbl" x="546" y="64">find "similar" candidates</text>
+      <text class="sub" x="546" y="82">RD-mix · Last.fm · heuristic search ·</text>
+      <text class="sub" x="546" y="98">audio fingerprint · LLM → SearchResult[]</text>
+
+      <path class="ln" d="M210,69 H266" marker-end="url(#arr)"/>
+      <path class="ln" d="M470,69 H524" marker-end="url(#arr)"/>
+
+      <!-- down to dedupe -->
+      <path class="ln" d="M725,116 V150" marker-end="url(#arr)"/>
+
+      <!-- Row 2: dedupe -> remix filter -->
+      <rect class="bx" x="530" y="156" width="390" height="86" rx="11"/>
+      <text class="step" x="546" y="178">④ DEDUPE &amp; REMIX FILTER</text>
+      <text class="sub" x="546" y="198">exclude: queue videoIds + recently-played ring</text>
+      <text class="sub" x="546" y="214">+ library songs{} · drop /slowed|reverb|remix/</text>
+      <text class="sub" x="546" y="230">key on videoId (item.key is NOT content-stable)</text>
+
+      <path class="ln" d="M530,199 H300" marker-end="url(#arr)"/>
+
+      <!-- Row 2 left: build item -->
+      <rect class="bx" x="20" y="156" width="270" height="86" rx="11"/>
+      <text class="step" x="34" y="178">⑤ resultToStreamItem()</text>
+      <text class="lbl" x="34" y="198">{source:{kind:'stream',</text>
+      <text class="lbl" x="34" y="216">&nbsp;&nbsp;videoId, url:''}}</text>
+      <text class="sub" x="34" y="232">ephemeral · no songId · no file</text>
+
+      <path class="ln" d="M155,242 V276" marker-end="url(#arr)"/>
+
+      <!-- Row 3: addToQueue -> live queue -->
+      <rect class="bx" x="20" y="282" width="270" height="80" rx="11"/>
+      <text class="step" x="34" y="304">⑥ addToQueue(item)</text>
+      <text class="lbl" x="34" y="324">append to tail</text>
+      <text class="sub" x="34" y="342">naturalOrder synced · no download</text>
+
+      <rect class="bx" x="340" y="276" width="260" height="92" rx="11"/>
+      <text class="step" x="354" y="298">⑦ LIVE QUEUE</text>
+      <text class="lbl" x="354" y="318">playerStore.queue[]</text>
+      <text class="sub" x="354" y="336">grows unbounded → prune played</text>
+      <text class="sub" x="354" y="352">QueuePanel renders (needs 'auto' badge)</text>
+
+      <path class="ln" d="M290,322 H336" marker-end="url(#arr)"/>
+
+      <!-- Row 3 right: lazy resolve at play time -->
+      <rect class="bx" x="650" y="276" width="270" height="92" rx="11"/>
+      <text class="step" x="664" y="298">⑧ _resolveSrc (lazy, at play)</text>
+      <text class="lbl" x="664" y="318">yt-dlp -g → direct URL</text>
+      <text class="sub" x="664" y="336">cached on item.source.url (~6h)</text>
+      <text class="sub" x="664" y="352">expiry → 1-shot retry then skip</text>
+
+      <path class="ln" d="M600,322 H646" marker-end="url(#arr)"/>
+
+      <!-- crossfade feedback -->
+      <path class="lnR" d="M785,276 V250 H470 V120" marker-end="url(#arrR)"/>
+      <text class="sub" x="478" y="262" fill="#ff9d4d">crossfade pre-resolves NEXT item ~5s before end —</text>
+      <text class="sub" x="478" y="276" fill="#ff9d4d">item must be appended BEFORE the fade window</text>
+    </svg>
+  </div>
+  <p class="note">Orange dashed = the timing constraint: if crossfade is on, the next "similar" track must already be in the queue (ideally URL-resolved) before the ~5s fade arm, or the session ends with a hard stop instead of a fade. That forces a <em>prefetch-ahead</em> design — append while &gt;5s of buffer remains, not at "ended".</p>
+</section>
+
+<!-- ============ CONFLICTS ============ -->
+<section id="conflicts">
+  <h2><span class="num">3</span> Affected areas &amp; conflicts</h2>
+  <p class="lead">Per-subsystem review findings. Blockers are surfaced first; expand each subsystem for the full set. Severity:
+    <span class="badge b-blocker">blocker</span>
+    <span class="badge b-major">major</span>
+    <span class="badge b-minor">minor</span>
+    <span class="badge b-info">info</span>
+  </p>
+
+  <div class="blockers-rail">
+    <h3>⛔ Blockers — these must be resolved for the feature to exist at all</h3>
+    <ul>
+      <li><span class="badge b-blocker">blocker</span><div><b>No related/similar discovery capability exists anywhere.</b> The only primitive is free-text <code class="inl">search()</code> via <code class="inl">ytsearch20</code>. A new Tauri command (e.g. <code class="inl">related/radio(videoId)</code>) must be added and registered in <code class="inl">lib.rs</code>. <span class="where">ytdlp.rs · lib.rs · api.ts</span></div></li>
+      <li><span class="badge b-blocker">blocker</span><div><b>Zero similarity-bearing metadata in the data model.</b> <code class="inl">Song</code>/<code class="inl">SearchResult</code> carry no genre/mood/tags/BPM/embeddings, and "artist" is unreliable uploader text. Nothing local to compute similarity from. <span class="where">types.ts: Song L11-21 · ytdlp.rs entry_to_result</span></div></li>
+      <li><span class="badge b-blocker">blocker</span><div><b>Song requires a downloaded file (filePath mandatory).</b> Ephemeral picks cannot be <code class="inl">Song</code>/library entries — they must live entirely as queue <code class="inl">PlaybackItem</code> stream entries. The feature lives in the queue layer, not the library. <span class="where">types.ts L19 · playback.ts songToItem</span></div></li>
+      <li><span class="badge b-blocker">blocker</span><div><b>Queue advance has no "auto-extend" hook.</b> <code class="inl">next()</code> is synchronous and stops at end-of-queue; appending similar songs is an async network round-trip. The single <code class="inl">else { audio.pause() }</code> point is the core integration site and isn't built to await. <span class="where">playerStore.ts next() L172-200</span></div></li>
+    </ul>
+  </div>
+
+  <!-- Subsystem accordions populated by script for brevity/consistency -->
+  <div id="subsystems"></div>
+</section>
+
+<!-- ============ APPROACHES ============ -->
+<section id="approaches">
+  <h2><span class="num">4</span> Approaches</h2>
+  <p class="lead">Five candidate mechanisms. Each defines "similar" differently, sources candidates differently, and trades cost/reliability/effort differently. They share steps ⑤–⑧ of the flow above; they differ only at step ③ (discovery) and how they fight the remix trap.</p>
+  <div id="appcards" class="grid"></div>
+</section>
+
+<!-- ============ MATRIX ============ -->
+<section id="matrix">
+  <h2><span class="num">5</span> Side-by-side comparison matrix</h2>
+  <p class="lead">The same approaches, one axis per row. Effort: <span class="eff eff-L">L</span> low · <span class="eff eff-M">M</span> medium · <span class="eff eff-XL">XL</span> very high.</p>
+  <div class="matrix-scroll">
+    <table class="matrix" id="matrix"></table>
+  </div>
+  <p class="note">All five reuse the existing ephemeral-stream pipeline (<code class="inl">resultToStreamItem</code> → <code class="inl">addToQueue</code> → lazy <code class="inl">_resolveSrc</code>) and none download. They diverge entirely on where the "similar" signal comes from and how reliably it dodges slowed+reverb re-uploads.</p>
+</section>
+
+<!-- ============ DECISIONS ============ -->
+<section id="decisions">
+  <h2><span class="num">6</span> Open questions / decisions you must make first</h2>
+  <p class="lead">Aggregated from every subsystem review. These are choices to settle before implementation — most are independent of which discovery approach you pick. Expand each for the options at stake.</p>
+  <div id="decisions"></div>
+</section>
+
+<footer>
+  Generated as a decision aid from the per-subsystem review findings and candidate approaches. No recommendation is embedded — the discovery strategy, persistence, UI surface, and mode-interaction choices are left to you.
+  <div class="note">File: <code class="inl">docs/auto-player-plan.html</code></div>
+</footer>
+
+</div>
+
+<script>
+/* ---------- SUBSYSTEM FINDINGS ---------- */
+const SEV = {blocker:'b-blocker',major:'b-major',minor:'b-minor',info:'b-info'};
+const SEVORD = {blocker:0,major:1,minor:2,info:3};
+
+const subsystems = [
+  {name:"Player &amp; queue store", sub:"playerStore.ts · audio.ts · playback.ts · QueuePanel.tsx", findings:[
+    ["blocker","No backend capability for 'similar/related' exists (from queue's reach)","api.ts L5-26","api exposes search/resolveStream/download only — no related/recommendations. The frontend can only approximate similarity by api.search with an artist/title query, which yields exactly the remix noise the user wants to avoid. A new Rust command is the hard dependency that makes the queue feature meaningful.","info"],
+    ["major","Queue advance ignores any 'auto-extend' concept","playerStore.ts next() L172-200, peekNextIndex() L11-20","next() walks index +1; at the end it loops (repeat=all) or pauses. No hook fires when the queue is about to run dry. The auto-player must inject 'top up' precisely where next() decides 'no next track' and where crossfade computes peekNextIndex — and next() has no async/await to fetch candidates.","blocker"],
+    ["major","next() is synchronous; appending similar songs is async","playerStore.ts next() L172-200","next() mutates index and calls void _load(), assuming the next item already exists. Finding similar songs needs a backend round-trip. Either proactive prefetch (append several tracks ahead so next() always finds a ready item) or restructure next() for a pending/loading state. Prefetch fits the existing pattern and avoids a silent gap.","major"],
+    ["major","repeat='all' loops the queue — conflicts with infinite auto-play","playerStore.ts next() L182-197","Under repeat=all, reaching the end resets index to 0 (reshuffling if shuffle is on): the same finite set forever. Auto-play wants an ever-growing new stream. Both claim the 'end of queue' moment and will fight unless one is explicitly subordinated.","major"],
+    ["major","Ephemeral items supported, but similarity seeds are thin","playback.ts resultToStreamItem L31-41 · types.ts L48-62","Good news: the queue already holds stream items, so 'append without downloading' needs no new data model. But the only seed metadata is videoId/title/artist/duration/thumbnail — NO genre/mood/audio-feature data anywhere. 'Similar' must be derived from videoId/title/artist alone. No api method for related videos exists; a new backend command is required.","major"],
+    ["major","item.key is a per-session counter, not content-stable","playback.ts uniq/counter L3-4, key gen L19,32","key is `${prefix}-${counter++}`, unique per call, not derived from videoId. Dedup is by key/songId, NOT videoId. To avoid appending a song already in the queue (or just played), you must dedup by videoId/songId yourself before appending; the 'no slowed+reverb dup' rule must also land here as title filtering at append time.","major"],
+    ["major","shuffle reshuffles the WHOLE queue, including appended songs","playerStore.ts next() reshuffle L185-189, toggleShuffle L244-290","On repeat-all loop or toggle, shuffleArray(queue) reorders everything. Auto-appended 'similar' songs are meant to follow the current vibe in order; with shuffle on, they get scrambled and the curated ordering is destroyed. Planner must decide if appended tracks are exempt from shuffle.","major"],
+    ["major","_consecutiveErrors guard stops playback when ~a queue's worth fails","playerStore.ts _onPlaybackError L465-494","If failures ≥ queue.length, playback pauses. Auto-appended stream URLs may fail (geo-block, removed, age-gate); a run of bad recommendations could trip the guard and halt the infinite stream. And failures≥queue.length is a moving target while the queue grows. Skipped tracks shouldn't count against growing the queue.","major"],
+    ["major","crossfade pre-resolves the NEXT item — appended items must exist before the fade","playerStore.ts _onTime arm L398-407, _startCrossfade L409-463","~5s before end, crossfade resolves the next item's URL and begins the overlap. For a seamless auto-player the next track must already be appended (ideally resolved) BEFORE the crossfade arm, or the last track ends with a hard stop. Forces prefetch-ahead.","major"],
+    ["minor","Discord presence reads playingPlaylistId to name the source","discordPresence.ts L31-32 · playerStore L37,95,115,128","Appending ephemeral songs into a queue with a playingPlaylistId misrepresents state (the playlist didn't gain those songs) and interacts with libraryStore's mirror logic. Decide whether enabling auto-play detaches playingPlaylistId (null/'Auto' sentinel).","minor"],
+    ["minor","QueuePanel has no notion of an auto-generated tail","QueuePanel.tsx entire, badge L146","Every item renders as draggable/removable; badge shows queue.length. No distinction between user-added and system-added. The queue grows unbounded; needs a UI decision: distinguish ephemeral auto-tracks, cap how many append ahead, and where the toggle lives.","minor"],
+  ]},
+  {name:"Backend search &amp; yt-dlp sidecar", sub:"ytdlp.rs · commands.rs · setup.rs · api.ts · playback glue", findings:[
+    ["blocker","No related/similar discovery capability exists","ytdlp.rs L53-109 (search) · lib.rs L14-28","The only discovery primitive runs `--flat-playlist` against `ytsearch20:`. No command asks for related videos, a YouTube Mix/radio (RD…), channel uploads, or autoplay continuation. lib.rs registers exactly five yt-dlp commands; none enumerate 'similar'. A new command (e.g. `related`/`radio`) is net-new work — yt-dlp can expose this via `watch?v=ID&list=RD<ID>` enumerated with `--flat-playlist --dump-json`.","blocker"],
+    ["major","search() returns almost no metadata usable for similarity","ytdlp.rs L111-136 entry_to_result, L8-17 SearchResult","entry_to_result extracts only id/title/uploader-as-artist/duration/thumbnail. `--flat-playlist` returns NO genre/tags/categories/album. SearchResult has no field to carry them. To compute similarity from metadata you must drop --flat-playlist (one network round-trip per video, slow) or rely on YouTube's Mix ordering. flat duration is also frequently null.","major"],
+    ["major","resolve_stream is single-URL per call — ephemeral append will hammer it","ytdlp.rs L150-183 · playerStore _resolveSrc L373-386","Each call is a full yt-dlp cold-start (~1-3s) for one URL. Auto-player appends many stream items continuously, plus the related/radio enumeration on top, plus steady -g resolves. No batching, no concurrency cap, no resolved-URL cache. No throttle exists anywhere.","major"],
+    ["major","YouTube stream URLs expire (~6h) — long unattended sessions fail mid-queue","playerStore L465-494, one-shot refresh L470-481","One refresh retry per item key, then skip. Two problems for always-on auto-play: (1) the 'whole queue failed' guard is sized to a finite queue; an unbounded queue shifts its semantics. (2) Multi-hour sessions cross the URL-expiry window; the single retry re-resolves but at the cost of more processes, with no proactive refresh.","major"],
+    ["major","Keys are process-local counters — dedup across discovery rounds is hard","playback.ts L3-4,31-41 · types.ts L52-62","resultToStreamItem mints a fresh `t<videoId>-<n>` key; the queue is keyed by that, not videoId. The auto-player must avoid re-appending the seed's own related list, already-queued, or already-played items, so it needs a new videoId-based 'seen' set. removeSongFromQueue keys on songId (undefined for streams), so it won't help either.","major"],
+    ["info","search() hardcodes ytsearch and YouTube watch URLs","ytdlp.rs L59-75,127 · playerStore L379","A related/radio command will similarly be YouTube-specific. If similarity = 'search the artist name', the EXISTING search() works (no backend change) but yields same-artist tracks and risks the remix-clone problem. A true radio (`&list=RD<id>`) is the better fit and needs new code.","info"],
+    ["info","download_song is irrelevant to ephemeral append","ytdlp.rs L186-315","download_song writes a file + metadata + library Song. Appended similar songs must be ephemeral: resultToStreamItem → stream → resolve_stream, never download_song. No change needed; confirms the path.","info"],
+    ["minor","yt-dlp invocations have no timeout / cancellation","ytdlp.rs L36-50,54-84,151-166,329-337","Every call awaits process completion with no timeout, socket-timeout flags, or cancellation. Background enumeration + resolves can leave hung processes (slow/geo-blocked) that can't be aborted when the user turns auto-player off or skips. Consider `--socket-timeout` and a cancellable spawn for the new command.","minor"],
+  ]},
+  {name:"Library, types &amp; persistence", sub:"types.ts · libraryStore.ts · persist.ts · downloadsStore.ts", findings:[
+    ["blocker","Song metadata model has zero similarity attributes","types.ts L11-21 (Song)","Song carries only id/title/artist/duration/videoId/url/thumbnail/filePath/addedAt — no genre/mood/tags/BPM/energy/album/embedding. 'artist' is the YouTube uploader (uploader→channel→uploader_id), often a topic channel or random re-uploader. The local model offers nothing to compute similarity from.","blocker"],
+    ["blocker","Song requires a downloaded file (filePath mandatory)","types.ts L19 · playback.ts songToItem L17-28","'Library songs are always downloaded (offline).' songToItem unconditionally builds a local-file source. Ephemeral picks can't be Song objects without a fake filePath. The feature must live entirely in the queue layer as stream PlaybackItems, not the library.","blocker"],
+    ["major","Persistence omits the queue entirely","persist.ts L11-37 · libraryStore L39-46","PersistedShape has only songs/playlists/settings. The live queue is rebuilt from scratch each launch. An auto-player flag + tuning belongs in Settings (safe via the forward-compatible loadAll merge). Ephemeral appended songs correctly evaporate on restart — confirm that's desired and no history surface is expected.","major"],
+    ["major","addToPlaylist mirrors into queue only for downloaded library songs","libraryStore L135-154 · playback.ts L17","The existing 'append to playing queue' path is hard-wired to library Song records + local playback. The auto-player needs a DIFFERENT path injecting stream items directly via addToQueue, without playlist entries or Song records. Reusing addToPlaylist is not viable.","major"],
+    ["major","No backend capability for related/similar/genre","ytdlp.rs L52-136 · grep genre|related|recommend|similar = no matches · api.ts","Only search(query)→ytsearch20 with --flat-playlist (lightweight metadata). No related videos, mix/radio, or genre tags. A new Rust command + api.ts binding + SearchResult-shaped return is required; the seed (current videoId/title/artist) is fine since the current item always carries them.","major"],
+    ["info","Ephemeral items DO exist — but only as queue PlaybackItems","types.ts L48-62 · playback.ts L31-41","PlaybackItem supports {kind:'stream',videoId,url} with optional songId. The natural home for auto-player output: append stream items via addToQueue without touching the library. But they're invisible to library/persistence and vanish on restart (matches 'ephemeral').","info"],
+    ["minor","DownloadStatus / downloadsStore are download-only, keyed by videoId","downloadsStore L1-27 · types.ts L65","Mostly orthogonal, but if a user later 'keeps' an ephemeral track, the download path keys by videoId and creates a normal Song. Since Song.id==videoId, an auto-played stream of an already-owned video could collide. Define dedup: skip videoIds already in songs{} or the queue.","minor"],
+    ["minor","De-duplication / identity is videoId-based across the model","types.ts L12,16 · playerStore L317-322","Identity everywhere is videoId. videoId only catches exact re-uploads, not title-variant remixes; title/artist-level dedup exists nowhere and must be built. Auto-appended stream items have undefined songId, so removeSongFromQueue can't target them — removal is by key only.","minor"],
+    ["info","loadAll settings merge is forward-compatible","persist.ts L24-28 · libraryStore setSettings L181-187","loadAll spreads {...defaults, ...saved}, so a new Settings field gets its default for existing users. Adding an autoPlayer boolean is safe/back-compat; setSettings would need a small addition only if toggling must immediately start/stop appending (mirroring crossfade). Cleanest integration point.","info"],
+  ]},
+  {name:"Streaming vs download / ephemeral playback", sub:"playback.ts · playerStore.ts · audio.ts · QueuePanel.tsx", findings:[
+    ["blocker","Backend has no similar/related capability","ytdlp.rs L54 search · L149 resolve_stream","search() runs ytsearch20 and entry_to_result discards genre/tags/categories/channel-id and any related data. The hard part ('HOW to find similar') has zero backend support. A new Tauri command is required — YouTube Mix (RDxxxx) or autoplay/related — and --flat-playlist means even per-entry metadata isn't fetched today.","blocker"],
+    ["major","Appending vs play-now semantics","playerStore L135 playNow · L146 addToQueue","playNow splices at index+1 and jumps (interrupts). addToQueue pushes to the END. Today ephemeral streams are ONLY ever played-now (Finder Play button); addToQueue is fed only downloaded Songs. Auto-player must APPEND via addToQueue — mechanically fine, but addToQueue has never been exercised with stream items.","major"],
+    ["major","Lazy stream URL resolution and expiry","playerStore L373 _resolveSrc · L465 _onPlaybackError","Resolved URL cached on item.source.url; one-shot retry on error (URLs last ~6h). Auto-appended songs sit in the queue longer, so their URLs are MORE likely stale. Resolve-at-append validates but spawns a yt-dlp subprocess per candidate AND flips the global loadingStream spinner. loadingStream can't represent 'resolving a future item'.","major"],
+    ["major","Similarity would re-surface remixes","ytdlp.rs L54 search","A plain ytsearch20 on title/artist returns slowed+reverb/remix near-duplicates FIRST — exactly what the user rejects. Any solution on the current search command must add filtering (reject same-videoId, title-superset of the seed, titles with remix/slowed/reverb/sped-up markers). No such filtering exists today.","major"],
+    ["major","No de-duplication against queue / already-played","playerStore L146 addToQueue · L49 queue","addToQueue appends unconditionally; there's no 'already played/queued' videoId set. Stream items have no songId, so the one dedup helper can't target them. An always-on appender will eventually loop. Define the 'seen' set and where it lives (per-session, cleared on toggle).","major"],
+    ["major","When to trigger the next append","playerStore L172 next · L388 _onTime · L409 _startCrossfade","If crossfade is on, _startCrossfade pre-resolves queue[next] ~5s before end — so the next auto item MUST already be queued (and ideally resolved) or crossfade bails to a gap. Append well before the last-5s window. Under repeat=off, end-of-queue stops playback, so auto-play must append before next() hits the end.","major"],
+    ["minor","Queue UI gives no signal that an item is ephemeral / auto-added","QueuePanel L25 QueueRow · ResultRow L18","A streamed item and a downloaded item look identical. No 'streaming'/'auto' badge. Users can't tell which tracks will vanish or keep one. Needs new UI state (an autoAdded/ephemeral flag) and rendering. The toggle for the feature itself has no home yet.","minor"],
+    ["minor","loadingStream is a single global flag, not per-item","playerStore L33,376,384","loadingStream means 'resolving the thing about to play' (drives the play-button spinner). Background candidate pre-resolution must NOT reuse it or it flashes 'loading current stream' while the current track plays fine. A separate state field is needed.","minor"],
+    ["info","Ephemeral teardown is free; nothing caps queue growth","playerStore (no persist) · audio.ts L63","removeFromQueue just drops the item; the resolved URL is a remote HTTP URL GC'd when the item leaves the array. The session and its 'seen' set die on restart (acceptable). But nothing caps growth — an always-on appender produces an unbounded array unless played items are pruned.","info"],
+    ["info","Ephemeral stream item creation is the right reusable factory","playback.ts L31 resultToStreamItem","Maps a SearchResult → {kind:'stream',videoId,url:''}, synchronous, no resolution. The right factory — but it requires a SearchResult-shaped object. Whatever 'find similar' source produces must be normalized into SearchResult first.","info"],
+  ]},
+  {name:"UI surfaces &amp; settings", sub:"SettingsView · NowPlayingBar · QueuePanel · Sidebar · uiStore", findings:[
+    ["major","Settings toggle pattern — but a plain Settings switch may be the wrong home","SettingsView crossfade L179-196, discord L198-220","Booleans render as role=switch rows calling setSettings. An auto-player toggle could slot in, but it's a per-session playback control the user wants near playback, not buried in Settings next to library folder/ffmpeg. Decide: Settings (persistent default) AND/OR NowPlayingBar/QueuePanel (live toggle).","major"],
+    ["major","Settings type + defaults + persistence wiring","types.ts L38-46 · libraryStore L30-36,181-187,54-70","A new flag requires touching the Settings interface, DEFAULT_SETTINGS, and mirroring into the player store on load() and in setSettings() — exactly how crossfade is mirrored. The trigger ('queue running low') lives in the player store, so the flag will be silently ignored at startup unless explicitly wired.","major"],
+    ["major","Runtime reactivity wiring (init-bridge pattern)","discordPresence initDiscordPresence L96-102 · AppShell L21-26","The auto-player needs an analogous bridge module (initAutoPlayer) subscribed to the player store, started from AppShell. Additive, not a conflict — but the subscribe-on-every-change pattern means the trigger runs on every position tick and must guard heavily (debounce, in-flight flag) to avoid firing yt-dlp repeatedly.","major"],
+    ["major","Queue UI cannot distinguish ephemeral auto-added tracks","QueuePanel QueueRow L25-83, header L142-147 · types L52-62","No visual marker for stream-vs-local; PlaybackItem has no 'auto-added'/'ephemeral' flag. Auto-added songs should be visibly distinct (badge/dim/divider) so the user knows they're ephemeral. The header is also where an inline on/off + 'clear auto songs' control would live. None exists.","major"],
+    ["major","PlaylistDetail / library deletion assumes every queue item is a library song","PlaylistDetail playAll L58-61 · LibraryPanel deleteSong L33 · removeSongFromQueue L314-322","Ephemeral items have no songId, so deletion/removeSongFromQueue won't touch them (good — they aren't library songs). But there's NO 'save/download this ephemeral track' action; the user will want 'hear a good suggestion → keep it'. PlaylistDetail and the queue row have no such action.","major"],
+    ["major","Shuffle / natural-order / playlist-origin assumptions break with auto-appended items","playerStore addToQueue L146-157, toggleShuffle L244-290, repeat-all reshuffle L183-190","Appending into a playlist-origin queue makes 'Playing playlist' show more tracks than the source has, and the Discord playlistName still claims playlist X. Under repeat-all the ephemeral list loops forever instead of fetching new. With shuffle, 'next is similar' may not hold. Define interaction with each mode + the origin label.","major"],
+    ["minor","Sidebar nav has no entry point and no auto-player surface","Sidebar NAV L11-14 · uiStore View L4","If auto-player is just a toggle it needs no nav entry. If it gets a dedicated 'Radio/Auto' surface (seed selection, source config), extend the View union + add a NAV item. Decide scope: toggle-only vs its own view.","minor"],
+    ["minor","uiStore is the right home for live (non-persisted) UI state","uiStore L10-20, partialize L40-44","If on/off is a session/live toggle it belongs here; if it must survive restart it belongs in Settings. The two stores have different persistence. Also no 'currently fetching similar songs' loading state exists — a separate indicator would be needed.","minor"],
+    ["minor","NowPlayingBar is the natural live-toggle location but has no spare slot","NowPlayingBar np-buttons L56-91","Most discoverable place for a live toggle (an 'infinity'/radio button next to shuffle/repeat), mirroring toggleShuffle/cycleRepeat. Required if the feature is to be usable without diving into Settings. loadingStream is global, so an auto-fetch indicator needs its own state.","minor"],
+  ]},
+  {name:"Integrations &amp; side-effects", sub:"Discord Rich Presence · session/queue persistence · library↔queue mirroring", findings:[
+    ["blocker","No 'similar songs' backend capability","ytdlp.rs L54 search · L151 resolve_stream · api.ts L6-26","Backend exposes only version/search/resolve_stream/download/delete. No related/recommended/similar, no metadata/genre/mood, no embeddings. The core gap behind the user's hard question. yt-dlp can extract a YouTube Mix (RD<videoId>) or related videos — lowest-effort source — but no such command exists; it must be added.","blocker"],
+    ["major","Presence playlist-name attribution misleads once auto-extended","discordPresence L31-34 · discord.rs L263-266,233-238","playlistName comes from playingPlaylistId resolved to a playlist name; presence shows 'Playlist: {name}' and 'Looping {name}'. Auto-player tracks have no playlist of origin, so once the queue auto-extends, presence keeps claiming a playlist the tracks aren't in. Decide: clear playingPlaylistId or set a synthetic 'Auto Mix' name.","major"],
+    ["major","Library↔queue mirroring keyed on playingPlaylistId","libraryStore L147-154,156-170,86-107","Editing the currently-playing playlist mirrors into the queue. If the user edits that playlist while auto-play has appended a tail, the new song lands AFTER the auto-mix tail, interleaving real and ephemeral items confusingly. Decide whether auto-player detaches playingPlaylistId once it starts appending.","major"],
+    ["major","Ephemeral item shape / dead-source + whole-queue-failed guard","playback.ts L31-41 · playerStore L373-386,465-494","Presence reads title/artist/duration/thumbnail — these MUST be populated by the similarity source or presence shows 'Unknown track'. The whole-queue-failed guard (failures≥queue.length) interacts badly with an ever-growing queue: as it appends, queue.length rises, so 'all sources dead' effectively never trips — a run of dead URLs could loop error→next forever. Must be bounded.","major"],
+    ["minor","Discord presence subscription doesn't distinguish 'radio/auto' tracks","discordPresence L96-102,82-93,25-45","Appends that don't change current() produce no signature change (good — no spurious re-push). But when auto-play advances to a similar song, presence shows it as a normal track; nothing labels it 'Auto Mix'/'Radio'. Decide whether to label them.","minor"],
+    ["info","No session/queue persistence exists","persist.ts L11-37 · libraryStore L38-46","Only songs/playlists/settings persist; queue/index/position/shuffle/playingPlaylistId are in-memory. An auto-player setting flows through persist automatically, but ephemeral appended songs must NOT persist (no filePath, expiring URL). Any future 'restore queue' would need to re-resolve or drop them.","info"],
+    ["info","Presence re-push throttling already tolerates rapid track changes","discordPresence L14,61-93 · discord.rs L142-170","Pushes throttle to one per 2s with trailing flush; the Rust worker coalesces latest-wins. An auto-player advancing through many clips won't overrun Discord. No change needed — the only risk is rapid auto-skip of dead URLs, which is the skip-loop problem, not presence.","info"],
+  ]},
+];
+
+function renderSubsystems(){
+  const host = document.getElementById('subsystems');
+  subsystems.forEach(ss=>{
+    const counts={blocker:0,major:0,minor:0,info:0};
+    ss.findings.forEach(f=>counts[f[0]]++);
+    const sorted=[...ss.findings].sort((a,b)=>SEVORD[a[0]]-SEVORD[b[0]]);
+    const strip=['blocker','major','minor','info'].filter(k=>counts[k]>0).map(k=>
+      `<span class="sev-count"><span class="dot" style="background:var(--${k})"></span> <b>${counts[k]}</b> ${k}</span>`).join('');
+    const findings=sorted.map(f=>{
+      const [sev,area,file,what,impactSev]=f;
+      return `<div class="finding">
+        <div class="f-head">
+          <span class="f-area">${area}</span>
+          <span class="badge ${SEV[sev]}">${sev}</span>
+        </div>
+        <div class="f-file">${file}</div>
+        <div class="f-body">
+          <div class="f-cell"><h5>What it does</h5><p>${what}</p></div>
+          <div class="f-cell impact"><h5>Conflict / impact</h5><p>${impactText(sev,area)}</p></div>
+        </div>
+      </div>`;
+    }).join('');
+    host.insertAdjacentHTML('beforeend',
+      `<details class="subsys">
+        <summary>
+          <svg class="chev" width="12" height="12" viewBox="0 0 12 12"><path d="M3 1 L9 6 L3 11" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="subsys-title">${ss.name}<br><span class="sub" style="color:var(--dim);font-size:12px;font-weight:400;font-family:ui-monospace,monospace">${ss.sub}</span></span>
+          <span class="sev-strip">${strip}</span>
+        </summary>
+        ${findings}
+      </details>`);
+  });
+}
+// impact stored inline already in 'what'? We separated: reuse the full impact via data. Simpler: store impact in the same array.
+function impactText(){return '';}
+
+/* The above split is fiddly; rebuild findings with explicit what+impact. */
+const findingsData = {
+ "Player &amp; queue store":[
+  ["info","No backend capability for 'similar/related' exists (from queue's reach)","api.ts L5-26","api exposes search/resolveStream/download only — there is no related/recommendations command and search takes free text only.","The 'find similar' core requirement has zero existing support reachable from here. Approximating it with api.search on an artist/title query yields exactly the remix/slowed+reverb noise to avoid. A real solution needs a new Rust command (RD-mix / YouTube Music radio) — the hard dependency that makes the queue feature meaningful."],
+  ["blocker","Queue advance ignores any 'auto-extend' concept","playerStore.ts next() L172-200 · peekNextIndex L11-20","next() walks index +1; at end it loops (repeat=all) or pauses. No hook fires when the queue is about to run dry.","The auto-player must inject 'top up with similar songs' precisely where next() decides 'no next track' and where crossfade computes peekNextIndex. The single else{audio.pause()} at L192-196 is the core integration point — and next() has no async/await, so appending (a network fetch) doesn't fit there as-is."],
+  ["major","next() is synchronous; appending similar songs is async","playerStore.ts next() L172-200","next() mutates index and calls void _load(), assuming the next item already exists.","Finding similar needs a backend round-trip next() can't block on. Either proactive prefetch (append several tracks ahead so next() always finds a ready item) or restructure next() for a pending/loading state. Prefetch (triggered in _onTime when N tracks remain) fits the existing pattern and avoids a silent gap."],
+  ["major","repeat='all' loops the queue — conflicts with infinite auto-play","playerStore.ts next() L182-197","Under repeat=all, reaching the end resets index to 0 (and reshuffles if shuffle is on): the same finite set plays forever.","Auto-play wants an ever-growing stream of new songs, not a loop. The planner must decide precedence: does enabling auto-play force repeat off, or does repeat=all win and suppress appending? Both features claim the 'end of queue' moment and will fight unless one is explicitly subordinated."],
+  ["major","Ephemeral items supported, but similarity seeds are thin","playback.ts resultToStreamItem L31-41 · types.ts L48-62","PlaybackItem already supports kind:'stream' with lazy URL resolution; resultToStreamItem is the exact shape an auto-appended track takes; _resolveSrc resolves on demand.","Good: the queue can already hold ephemeral items, so 'append without downloading' needs no new data model. But the only seed metadata is videoId/title/artist/duration/thumbnail — NO genre/mood/audio-feature data anywhere. 'Similar' must derive from videoId/title/artist alone, and there's no api method for related videos — a new backend command is required."],
+  ["major","item.key is a per-session counter, not content-stable","playback.ts uniq/counter L3-4 · key gen L19,32","key is `${prefix}-${counter++}`, unique per call, not derived from videoId. Dedup is by key (reorder/dnd/remove) and by songId — videoId is NOT an identity key.","To avoid appending a song already in the queue (or just played), you must dedup by videoId/songId yourself before appending; the key system won't catch it (fresh key even for the same video). The 'no slowed+reverb dup' rule must also land here as title-based filtering at append time, since nothing downstream dedups by content."],
+  ["major","shuffle reshuffles the WHOLE queue, including appended songs","playerStore.ts next() reshuffle L185-189 · toggleShuffle L244-290 · playShuffled L121-133","On repeat-all loop or toggle, shuffleArray(queue) reorders everything; toggleShuffle pins current to front and shuffles the rest, storing naturalOrder to restore.","Auto-appended 'similar' songs are meant to follow the current vibe in order. With shuffle on, newly appended items get scrambled into the existing set and the curated 'what comes next' ordering is destroyed. Decide: are appended tracks exempt from shuffle (appended strictly after current, never reshuffled)? next()'s reshuffle doesn't respect naturalOrder's appended entries."],
+  ["major","_consecutiveErrors guard stops playback when ~a queue's worth fails","playerStore.ts _onPlaybackError L465-494","If failures ≥ queue.length, playback pauses to avoid hammering dead sources. Stream URLs expire (~6h), are retried once per item, then skipped.","Auto-appended ephemeral tracks may fail (geo-block, removed, age-gate). A run of bad recommendations could trip the guard and halt the infinite stream. And failures≥queue.length is a moving target while the queue grows. A skipped track shouldn't count against growing the queue; exhausting candidates shouldn't read as 'all sources dead'."],
+  ["major","crossfade pre-resolves the NEXT item — appended items must exist before the fade","playerStore.ts _onTime arm L398-407 · _startCrossfade L409-463","~5s before end, _onTime computes peekNextIndex and, if a next item exists, _startCrossfade resolves its URL and begins the overlap. peekNextIndex returns null at end-of-queue (repeat off).","For a seamless auto-player the next similar track must already be appended (ideally URL-resolved) BEFORE the crossfade arm, or the last track ends with a hard stop. Forces a prefetch-ahead design: append the next candidate while there's still >5s of buffer. _startCrossfade re-finds the item by key after async resolve, so concurrent appends during a fade are tolerated — but only if appended before the fade started."],
+  ["minor","Discord presence reads playingPlaylistId to name the source","discordPresence.ts L31-32 · playerStore L37,95,115,128","playingPlaylistId identifies which playlist the queue came from; null for ad-hoc. libraryStore mirrors playlist edits into the queue only when it matches.","An auto-player session is neither a saved playlist nor a simple ad-hoc queue. Appending ephemeral songs into a queue with a playingPlaylistId misrepresents state and interacts with the mirror logic. Decide whether enabling auto-play detaches playingPlaylistId (null / 'Auto' sentinel) so UI/Discord/mirroring don't treat appended tracks as part of the source playlist."],
+  ["minor","QueuePanel has no notion of an auto-generated tail","QueuePanel.tsx entire · badge L146","Renders every item as draggable/removable; badge shows queue.length. No distinction between user-added and system-added tracks.","With auto-play on, the queue grows without bound; the count badge and list become unbounded with no affordance to mark/clear auto-appended tracks or toggle the feature. Decide: distinguish ephemeral auto-tracks, cap how many append ahead, and where the on/off toggle lives."],
+ ],
+ "Backend search &amp; yt-dlp sidecar":[
+  ["blocker","No related/similar discovery capability exists","ytdlp.rs L53-109 (search) · lib.rs L14-28","The only discovery primitive runs `yt-dlp --dump-json --flat-playlist` against `ytsearch20:<query>` or a pasted URL. lib.rs registers exactly five yt-dlp commands; none enumerate 'similar'.","The feature's entire 'find similar' requirement has zero backend support. A new command must be added (e.g. related(videoId)/radio(videoId)) and registered. yt-dlp can expose this via a Mix `watch?v=ID&list=RD<ID>` enumerated with --flat-playlist --dump-json (an ordered radio of genre/mood-similar tracks, NOT slowed+reverb clones). None of this is wired — net-new work."],
+  ["major","search() returns almost no metadata usable for similarity","ytdlp.rs L111-136 (entry_to_result) · L8-17 (SearchResult)","entry_to_result extracts only id/title/uploader-as-artist/duration/thumbnail. --flat-playlist returns NO genre/tags/categories/album/views; SearchResult has no field for them anyway.","If similarity is computed from yt-dlp metadata, flat search gives nothing to compute on. Either drop --flat-playlist (one network round-trip per candidate, slow) or rely on YouTube Mix/radio ordering as the signal. Both need new code; SearchResult/entry_to_result must grow fields. flat duration is also frequently null, so even durationSec is unreliable for filtering."],
+  ["major","resolve_stream is single-URL per call — ephemeral append will hammer it","ytdlp.rs L150-183 · playerStore _resolveSrc L373-386","resolve_stream spawns one yt-dlp process per call (`-g`) returning one direct URL; the player resolves lazily, one item at a time. Each call is a full cold-start (~1-3s).","Auto-player appends many ephemeral items continuously, adding the related/radio enumeration on top of a steady stream of -g resolves. No batching, no concurrency cap, no resolved-URL cache. No throttle exists anywhere. Decide whether to pre-resolve (extra processes) or stay lazy (fine, but enumeration itself is an added process)."],
+  ["major","YouTube stream URLs expire (~6h) — long unattended sessions fail mid-queue","playerStore L465-494 · one-shot refresh L470-481","On a media error the store does ONE refresh retry per item key (drops url, re-resolves), then skips. A consecutive-error guard STOPS playback once failures ≥ queue.length.","Two problems: (1) the 'whole queue failed' guard is sized to a finite queue — an unbounded auto-queue shifts its semantics, so a long run of dead related tracks may auto-skip far longer before stopping. (2) Multi-hour sessions cross the ~6h expiry; the single retry re-resolves correctly but at the cost of more processes, with no proactive refresh. The retry logic assumed a bounded, user-built queue."],
+  ["major","Keys are process-local counters — dedup across discovery rounds is hard","playback.ts L3-4,31-41 · types.ts L52-62","resultToStreamItem mints a fresh `t<videoId>-<n>` key; the queue is keyed by that, not videoId. PlaybackItem carries videoId but the queue dedups by key.","The auto-player must avoid re-appending the seed's own related list, already-queued, or already-played items, so it needs a new videoId-based 'seen' set. removeSongFromQueue keys off songId (undefined for streams), so it won't help dedup streams either. A frontend/queue-model gap the backend results feed into."],
+  ["info","search() hardcodes ytsearch and YouTube watch URLs","ytdlp.rs L59-75,127 · playerStore L379","search builds `ytsearch20:` prefixes and entry_to_result hardcodes `watch?v={id}`; resolve_stream uses the same pattern. No abstraction layer.","A related/radio command will similarly be YouTube-specific (consistent with the app). If similarity = 'search the artist name', the EXISTING search() works with no backend change — but yields same-artist tracks and risks the remix-clone problem (a title search surfaces 'slowed + reverb' versions). A true radio (&list=RD<id>) is the better fit and needs new code."],
+  ["info","download_song is irrelevant to ephemeral append","ytdlp.rs L186-315","download_song extracts audio to disk, embeds metadata/thumbnail, emits progress, returns a file path; it's the only path that produces a library Song with filePath.","Appended similar songs must be ephemeral. The correct path is resultToStreamItem → kind:'stream' → resolve_stream, never download_song. No change needed here; it confirms the auto-player builds stream items (no songId, no filePath, no library entry) and that songId-based UI won't apply to them."],
+  ["minor","yt-dlp invocations have no timeout / cancellation","ytdlp.rs L36-50,54-84,151-166,329-337","Every call awaits .output() with no timeout, no socket-timeout flags, no cancellation. search and resolve_stream block until yt-dlp exits.","Background enumeration + resolves can leave hung yt-dlp processes (slow network, geo-blocked) with no cancellation. If the user turns auto-player off or skips, in-flight related/resolve calls can't be aborted (commands return a Result, not a child handle). Add `--socket-timeout` and consider a cancellable spawn for the new command."],
+ ],
+ "Library, types &amp; persistence":[
+  ["blocker","Song metadata model has zero similarity attributes","types.ts L11-21 (Song)","Song carries only id/title/artist/duration/videoId/url/thumbnail/filePath/addedAt — no genre/mood/tags/BPM/energy/album/embedding. 'artist' is the YouTube uploader (uploader→channel→uploader_id), often a topic channel or random re-uploader.","The auto-player's core need is 'find similar songs', and the model has zero similarity-bearing attributes. The one artist-looking field is unreliable uploader text, so even naive artist-based similarity is shaky. The planner must decide where similarity comes from (yt-dlp related/mix, an external API, or ffprobe audio features) because the local model offers nothing."],
+  ["blocker","Song requires a downloaded file (filePath mandatory)","types.ts L19 · playback.ts songToItem L17-28","Song.filePath is required. 'Library songs are always downloaded (offline).' songToItem unconditionally builds source:{kind:'local',path:song.filePath}.","Ephemeral picks can't be Song objects without inventing a fake filePath (which songToItem would then point at nothing). So auto-player picks must be PlaybackItem stream entries only — the feature lives entirely in the queue layer, not the library layer."],
+  ["major","Persistence omits the queue entirely","persist.ts L11-37 · libraryStore L39-46","PersistedShape has only songs/playlists/settings; saveAll writes those three keys. The live queue is never persisted and is rebuilt each launch.","(1) An auto-player flag + tuning belong in Settings and must be added to DEFAULT_SETTINGS and the loadAll merge (which already spreads defaults, so it's back-compat). (2) Because the queue isn't persisted, ephemeral appended songs correctly evaporate on restart — matching 'ephemeral'. Confirm that's desired and that no 'recently auto-played' history is expected."],
+  ["major","addToPlaylist mirrors into queue only for downloaded library songs","libraryStore L135-154 · playback.ts songToItem L17","addToPlaylist takes a songId, looks up songs[songId], and if that playlist is playing, mirrors it into the queue via songToItem (local-file item). Hard-wired to library Songs + local playback.","This is the existing 'append to playing queue' path, but it only works for songs with a file. The auto-player needs a DIFFERENT path injecting stream PlaybackItems directly via addToQueue, without playlist entries or Song records. Reusing addToPlaylist is not viable; a new mechanism is required."],
+  ["major","No backend capability for related/similar/genre","ytdlp.rs L52-136 · grep genre|related|recommend|similar = no matches · api.ts","Only search(query)→ytsearch20 with --flat-playlist (lightweight metadata: id/title/uploader/duration/thumbnail). No related videos, mix/radio, or genre tags fetched; --flat-playlist deliberately skips per-video metadata.","The 'how to find similar' problem has no existing backend to build on. Add a new Rust command (RD-mix, related entries, or a text-query heuristic) + an api.ts binding + SearchResult-shaped return. Net-new work outside this subsystem, but the library/types layer must expose the seed (current videoId/title/artist), which the current PlaybackItem always carries."],
+  ["info","Ephemeral items DO exist — but only as queue PlaybackItems","types.ts L48-62 · playback.ts L31-41","PlaybackItem supports source:{kind:'stream',videoId,url} with optional songId; resultToStreamItem builds one from a SearchResult with no Song/filePath, lazy resolution. The queue is the only place ephemeral audio lives.","The natural home for auto-player output: append stream items via addToQueue without touching the library. But appended songs are invisible to library/persistence — no Song record, not searchable, gone on restart (queue isn't persisted). The generator must produce SearchResult-like data to feed resultToStreamItem."],
+  ["minor","DownloadStatus / downloadsStore are download-only, keyed by videoId","downloadsStore L1-27 · types.ts L65","downloadsStore tracks per-videoId download progress, assuming any tracked video is meant to land a file. Keyed solely by videoId.","Mostly orthogonal, but a sharp edge: if a user later 'keeps' an ephemeral track, the download path keys by videoId and creates a normal Song. Since Song.id==videoId, an auto-played stream of an already-owned video could collide/duplicate. Define dedup: skip videoIds already in songs{} or in the queue."],
+  ["minor","De-duplication / identity is videoId-based across the model","types.ts L12,16 · playerStore removeSongFromQueue L317-322","Identity everywhere is videoId (songs{} keyed by it). Queue removal-by-song matches on songId (only set for local items). PlaybackItem.key is a separate per-instance id.","The auto-player must avoid re-appending a videoId already playing/queued, and the slowed+reverb problem — but videoId only catches exact re-uploads, not title-variant remixes. Title/artist-level dedup exists nowhere and must be built. Auto-appended stream items have undefined songId, so removeSongFromQueue can't target them; removal is by key only."],
+  ["info","loadAll settings merge is forward-compatible","persist.ts L24-28 · libraryStore setSettings L181-187","loadAll returns settings as {...defaults, ...saved}, so a new field gets its default for existing users; setSettings persists partial patches and special-cases crossfade.","Adding an autoPlayer boolean (+ params) is safe and back-compatible. setSettings would need a small addition only if toggling must immediately start/stop appending (mirroring how crossfade is pushed into playerStore). The cleanest integration point in this subsystem."],
+ ],
+ "Streaming vs download / ephemeral playback":[
+  ["blocker","Backend has no similar/related capability","ytdlp.rs L54 search · L149 resolve_stream","search() runs ytsearch20 + --flat-playlist and maps entries to SearchResult; entry_to_result extracts ONLY id/title/uploader/duration/thumbnail, discarding genre/tags/categories/channel-id and any related data. resolve_stream runs `-f bestaudio -g`.","There is NO backend command to find similar/related, and search throws away every field that could define similarity. The hard part ('HOW to find similar') has zero existing support. A new Tauri command is required (RD-mix, watch-page related, or re-search). --flat-playlist means even per-entry metadata isn't fetched; a similarity engine needing tags must drop it or do a slow second per-video pass."],
+  ["major","Appending vs play-now semantics","playerStore L135 playNow · L146 addToQueue","playNow splices at index+1 and jumps (interrupts current). addToQueue pushes to the END and only auto-loads if the queue was empty. Today the Finder Play button uses playNow, so an ephemeral stream is ONLY ever played-now; addToQueue is fed only downloaded Songs.","The auto-player must APPEND via addToQueue, not playNow. addToQueue already accepts any PlaybackItem including a stream item, so mechanically it works — BUT it's never been exercised with stream items. Edge behavior (naturalOrder sync, wasEmpty load) has only been tested with local sources. The core integration point needs a new caller feeding ephemeral stream items."],
+  ["major","Lazy stream URL resolution and expiry","playerStore L373 _resolveSrc · L465 _onPlaybackError","_resolveSrc caches the resolved URL on item.source.url after the first `-g`. _onPlaybackError treats a media error on a stream with a non-empty url as likely-expired, clears it, and retries ONCE per item. Resolution sets a GLOBAL loadingStream flag.","Auto-appended songs sit in the queue longer, so their URLs are MORE likely stale than a play-now stream (the 6h retry partially covers this). If you pre-resolve at append to validate, every append spawns a yt-dlp subprocess (~1-3s) and flips the global spinner ('loading the current stream'). Decide: resolve-at-append (costly, validates) vs resolve-lazily (cheap, but a bad candidate only fails when reached). loadingStream can't represent 'resolving a future item'."],
+  ["major","Similarity would re-surface remixes","ytdlp.rs L54 search","Search is a plain ytsearch20 text query; results are whatever YouTube returns ranked by relevance.","The user explicitly does NOT want slowed+reverb/remix near-duplicates of the SAME song. A naive 'search by current title/artist' (the easiest build) returns exactly those FIRST. Any solution on the current search must add filtering: reject same-videoId, titles that are a superset of the seed title, and titles with remix/slowed/reverb/sped-up markers. No such filtering exists today."],
+  ["major","No de-duplication against queue / already-played","playerStore L146 addToQueue · L49 queue","The queue is a flat PlaybackItem[]; addToQueue appends unconditionally. There's no 'already played'/'already queued' videoId set. removeSongFromQueue matches by songId, which streams don't have.","An always-on appender will eventually re-append a song already in the queue or just played, causing loops. There's no existing dedup key to prevent this, and streams have no songId, so the one dedup helper can't target them — dedup must key on videoId. Define the 'seen' set and where it lives (per-session, cleared when auto-player turns off)."],
+  ["major","When to trigger the next append","playerStore L172 next · L388 _onTime · L409 _startCrossfade","Advancement happens via next() (track end / skip), repeat handling, and a crossfade arm in _onTime when dur−cur < 5s. next() stops at the end of a non-repeat queue.","The auto-player must hook to 'top up' before the queue runs dry. If crossfade is ON, _startCrossfade pre-resolves queue[next] ~5s before end — so the next auto item MUST already be queued (ideally resolved) or crossfade silently bails to a gap. Append well before the last-5s window. Under repeat=off, end-of-queue stops playback, so auto-play must append before next() hits the end."],
+  ["minor","Queue UI gives no signal that an item is ephemeral / auto-added","QueuePanel L25 QueueRow · ResultRow L18","QueueRow renders title/artist/thumbnail identically for local and stream items — nothing distinguishes downloaded from ephemeral. No 'streaming'/'auto' badge. PlaybackItem has no 'auto-added'/'ephemeral' flag.","Users can't tell auto-appended ephemeral songs from their own queue, can't tell which vanish, and have no affordance to keep/download a suggestion. Needs new UI state (an autoAdded/ephemeral flag, or a source.kind check) + rendering. The toggle for the feature itself has no home yet (PlayerBar/QueuePanel/Settings all candidates)."],
+  ["minor","loadingStream is a single global flag, not per-item","playerStore L33,376,384","loadingStream is one boolean toggled around the active resolve; it means 'we are resolving the thing about to play' for the spinner.","If the auto-player pre-resolves candidate URLs in the background, it must NOT reuse loadingStream or it flashes 'loading current stream' while the current track plays fine. A separate, non-UI resolution path (or distinct state field) is needed for background candidate resolution."],
+  ["info","Ephemeral teardown is free; nothing caps queue growth","playerStore (no persist) · audio.ts L63 play()","The player store isn't persisted. Teardown is implicit — removeFromQueue drops the item from the array; audio.ts overwrites el.src on the next track. The resolved URL is a remote HTTP URL GC'd when the item leaves the array.","Good: ephemeral teardown is essentially free, so pruning played items is just removeFromQueue. The session and its 'seen' set die on restart (acceptable — confirm no resume of an auto-radio session is expected). But nothing caps growth — an always-on appender produces an unbounded array unless old played items are pruned."],
+  ["info","Ephemeral stream item creation is the right reusable factory","playback.ts L31 resultToStreamItem()","Maps a SearchResult → PlaybackItem {kind:'stream',videoId,url:''}; url is resolved lazily on play. The ONLY factory for ephemeral stream items; requires a full SearchResult. Purely synchronous, no resolution.","The right reusable factory — but it requires a SearchResult-shaped object. Whatever 'find similar' source produces (related videos, search results, an embedding service) must be normalized into SearchResult before it can become a queue item. There's no path that builds a PlaybackItem from anything other than a SearchResult or a downloaded Song."],
+ ],
+ "UI surfaces &amp; settings":[
+  ["major","Settings toggle pattern — a plain Settings switch may be the wrong home","SettingsView crossfade L179-196 · discord L198-220","Boolean toggles render as a role=switch button reading settings.crossfade / settings.discordPresence and calling setSettings. The established on/off pattern.","An auto-player toggle could slot in as a new switch row, but auto-play is a per-listening-session control the user wants near playback, not buried in Settings next to library folder/ffmpeg. Decide whether the master toggle lives in Settings (persistent default) AND/OR in NowPlayingBar/QueuePanel (live toggle). At minimum a Settings.autoPlay boolean is added, but unlike crossfade there's no obvious always-on global it maps to."],
+  ["major","Settings type + defaults + persistence wiring","types.ts L38-46 · libraryStore L30-36,181-187,54-70","Settings is a flat persisted object. A new flag requires adding it to the interface, to DEFAULT_SETTINGS, and (if the runtime needs it) mirroring into the player store on load() and in setSettings() — exactly how crossfade is mirrored via setCrossfade.","Critically, crossfade is mirrored because the player runtime reads it during playback; the auto-player needs the same mirroring because the trigger ('queue running low') lives in the player store, not the library store. The current load() only mirrors crossfade — a new flag will be silently ignored at startup unless explicitly wired."],
+  ["major","Runtime reactivity wiring (init-bridge pattern)","discordPresence initDiscordPresence L96-102 · AppShell L21-26","discordPresence is a bridge module subscribing to both stores, started once from AppShell's mount effect. The existing pattern for 'react to playback state changes at runtime'.","The auto-player almost certainly needs an analogous bridge (initAutoPlayer) subscribed to the player store to watch index/queue length and append near the end, plus a call in AppShell. Additive, not a conflict — but the subscribe-on-every-change pattern means the trigger runs on every position tick and must guard heavily (debounce, in-flight flag) to avoid firing yt-dlp repeatedly."],
+  ["major","Queue UI cannot distinguish ephemeral auto-added tracks","QueuePanel QueueRow L25-83 · header L142-147 · types L52-62","Renders the live 'Playing playlist' queue; each row shows thumb/title/artist + a remove button; current shows an EQ icon. No visual marker for stream-vs-local. PlaybackItem has no 'auto-added'/'ephemeral' flag.","Auto-added songs should be visibly distinct (a 'Radio'/'auto' badge, dimmed, or a 'Up next — auto' divider) so the user knows they're ephemeral and not part of the playlist. Requires adding a field to PlaybackItem and rendering it. The header (+count badge) is also where an inline on/off + 'clear auto songs' control would live. None exists; PlaybackItem carries no provenance beyond source.kind."],
+  ["major","PlaylistDetail / library deletion assumes every queue item is a library song","PlaylistDetail playAll L58-61 · LibraryPanel deleteSong L33 · removeSongFromQueue L314-322","PlaylistDetail builds the queue exclusively from downloaded songs via songToItem (local source + songId). LibraryPanel is the only place songs are deleted; deletion calls removeSongFromQueue(songId), pulling every queue entry whose songId matches.","Ephemeral items have NO songId, so (1) they correctly won't be touched by removeSongFromQueue/deleteSong — good. But (2) there's no way to 'save'/download an auto-added ephemeral song into the library/playlist; the user will want 'hear a good suggestion → keep it', and no such action exists in PlaylistDetail or the queue row. (3) playlist-membership display is irrelevant to ephemeral tracks."],
+  ["major","Shuffle / natural-order / playlist-origin assumptions break with auto-appended items","playerStore addToQueue L146-157 · toggleShuffle L244-290 · repeat-all reshuffle L183-190","addToQueue appends and keeps naturalOrder in sync; toggleShuffle and repeat-all rebuild order from the whole queue; playingPlaylistId tags the queue as belonging to one source playlist (used by the QueuePanel header and Discord playlistName).","(a) Appended songs make 'Playing playlist' show more tracks than the source has and the Discord name still claims playlist X while playing songs not in X. (b) With repeat-all, the queue loops the ephemeral songs forever instead of fetching new ones. (c) Appending while shuffle is on lands at the end of an already-shuffled queue, so 'next is similar' may not hold. Define interaction with shuffle, repeat-all, and the origin label."],
+  ["minor","Sidebar nav has no entry point and no auto-player surface","Sidebar NAV L11-14 · uiStore View L4","Static two-item nav (Finder, Playlists) + Settings in footer. View type is 'finder'|'playlists'|'settings'.","Low impact: if auto-player is purely a toggle it needs no nav entry. But a dedicated 'Radio/Auto' surface (seed selection, source config) would require extending the View union and adding a NAV item. Flagged so the planner explicitly decides scope: toggle-only vs its own view."],
+  ["minor","uiStore is the right home for live (non-persisted) UI state","uiStore UIState L10-20 · partialize L40-44","Zustand store persisted under 'lmp-ui' for view/sidebar/queueWidth; selectedPlaylistId is in-memory-only. Where transient UI toggles live.","If on/off is meant to be a session/live toggle, it belongs here (like a UI flag) rather than in Settings; if it must survive restart it belongs in Settings. The two stores have different persistence. There's also no 'currently fetching similar songs' loading state — a spinner analogous to loadingStream would need new state."],
+  ["minor","NowPlayingBar is the natural live-toggle location but has no spare slot","NowPlayingBar np-buttons L56-91","Transport bar with shuffle/prev/play/next/repeat wired to playerStore actions; loadingStream drives the play-button spinner.","The most discoverable place for a live toggle (an 'infinity'/radio button next to shuffle/repeat), mirroring toggleShuffle/cycleRepeat. No conflict, but a required UI addition if the feature is to be usable without diving into Settings. loadingStream is global, so an auto-fetch-in-progress indicator needs its own state to avoid colliding with the play-button spinner."],
+ ],
+ "Integrations &amp; side-effects":[
+  ["blocker","No 'similar songs' backend capability","ytdlp.rs L54 search · L151 resolve_stream · api.ts L6-26","Backend exposes only version/search/resolve_stream/download/delete. There is NO related/recommended/similar command, no metadata/genre/mood source, no embeddings.","This is the core gap behind the user's hard question. yt-dlp can extract a YouTube Mix (RD<videoId>) or related videos — the lowest-effort source — but no such command exists; it must be added (new Tauri command + api.ts wrapper). Genre/mood/artist-style similarity has no data source in the app at all. The planner must choose the strategy and a data source; the backend provides none."],
+  ["major","Presence playlist-name attribution misleads once auto-extended","discordPresence L31-34 · discord.rs L263-266,233-238","playlistName comes from playingPlaylistId resolved against playlists; presence shows 'Playlist: {name}' and 'Looping {name}', assuming the queue corresponds to a real saved playlist.","Auto-player tracks have no playlist of origin. If the queue started from playlist X and auto-extends, presence keeps claiming 'Playlist: X' / 'Looping X' for tracks NOT in X. With repeat=all the badge says 'Looping {name}', misleading once non-playlist songs are appended. Decide how presence labels a drifted queue (clear playingPlaylistId, or a synthetic 'Auto Mix')."],
+  ["major","Library↔queue mirroring keyed on playingPlaylistId","libraryStore L147-154,156-170,86-107","Editing the currently-playing playlist mirrors the change into the queue via addToQueue / removeSongFromQueue; deleteSong yanks the song library-wide. All assume queue items correspond to library songs.","removeSongFromQueue matches on songId, which ephemeral items lack (mostly fine — they aren't library songs). But the auto-player appends stream items into a queue whose playingPlaylistId still points at a real playlist; if the user then edits that playlist, addToPlaylist appends the new song AFTER the auto-mix tail, interleaving real and ephemeral items confusingly. Decide whether auto-player detaches playingPlaylistId once it starts appending."],
+  ["major","Ephemeral item shape + whole-queue-failed guard interact badly","playback.ts L31-41 · types L48-62 · playerStore L373-386,465-494","Stream items carry {kind:'stream',videoId,url:''} resolved lazily; resolved URLs expire; _onPlaybackError retries once then skips. No filePath/songId, no thumbnail guarantee.","The auto-player must produce items in exactly this shape so playback/crossfade/error-retry work. Discord presence reads title/artist/duration/thumbnail — these MUST be populated or presence shows 'Unknown track'. The whole-queue-failed guard (failures≥queue.length) interacts badly with an ever-growing queue: as it appends, queue.length rises, so 'all sources dead' effectively never trips — a run of dead URLs could loop error→next forever. Must be bounded."],
+  ["minor","Discord subscription doesn't distinguish 'radio/auto' tracks","discordPresence L96-102,82-93,25-45","On every player change it rebuilds a presence snapshot from current() and re-pushes when the signature changes. Subscribes once, globally, with no notion of where queue items came from.","Auto-appended songs that become current() each fire a presence update like any track (correct/desired). Appends that don't change current() produce no signature change (good — no spurious re-push). But when auto-play advances to a similar song, presence shows it as a normal track; nothing distinguishes 'radio/auto'. Decide whether to label them ('Auto Mix'/'Radio')."],
+  ["info","No session/queue persistence exists","persist.ts L11-37 · libraryStore L38-46","Only songs/playlists/settings persist to library.json. The live queue, index, position, shuffle order, and playingPlaylistId are in-memory and not saved/restored.","Not a blocker, but a gap to address consciously: there's no 'session restore' to break. An auto-player setting flows through persist automatically, but ephemeral appended songs must NOT persist (no filePath, expiring URL). Any future 'restore queue' would need to re-resolve or drop ephemeral stream items."],
+  ["info","Presence re-push throttling already tolerates rapid track changes","discordPresence L14,61-93 · discord.rs L142-170","Pushes throttle to one per 2s with trailing flush; the Rust worker further coalesces queued snapshots latest-wins. Designed so a playlist firing one push per track can't backlog.","Already tolerates frequent track changes, so an auto-player advancing through many short clips won't overrun Discord — no change needed, the planner can rely on it. The only risk is rapid auto-skip of many dead ephemeral URLs, which would still coalesce fine but indicates the underlying skip loop, not presence, is the problem."],
+ ],
+};
+
+function renderSubsystems2(){
+  const host=document.getElementById('subsystems');
+  host.innerHTML='';
+  subsystems.forEach(ss=>{
+    const data=findingsData[ss.name];
+    const counts={blocker:0,major:0,minor:0,info:0};
+    data.forEach(f=>counts[f[0]]++);
+    const sorted=[...data].sort((a,b)=>SEVORD[a[0]]-SEVORD[b[0]]);
+    const strip=['blocker','major','minor','info'].filter(k=>counts[k]>0).map(k=>
+      `<span class="sev-count"><span class="dot" style="background:var(--${k})"></span> <b>${counts[k]}</b> ${k}</span>`).join('');
+    const findings=sorted.map(f=>{
+      const [sev,area,file,what,impact]=f;
+      return `<div class="finding">
+        <div class="f-head"><span class="f-area">${area}</span><span class="badge ${SEV[sev]}">${sev}</span></div>
+        <div class="f-file">${file}</div>
+        <div class="f-body">
+          <div class="f-cell"><h5>What it does</h5><p>${what}</p></div>
+          <div class="f-cell impact"><h5>Conflict / impact</h5><p>${impact}</p></div>
+        </div>
+      </div>`;
+    }).join('');
+    host.insertAdjacentHTML('beforeend',
+      `<details class="subsys"${counts.blocker?' open':''}>
+        <summary>
+          <svg class="chev" width="12" height="12" viewBox="0 0 12 12"><path d="M3 1 L9 6 L3 11" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="subsys-title">${ss.name} <span style="color:var(--dim);font-size:12px;font-weight:400;font-family:ui-monospace,monospace">— ${ss.sub}</span></span>
+          <span class="sev-strip">${strip}</span>
+        </summary>
+        ${findings}
+      </details>`);
+  });
+}
+
+/* ---------- APPROACHES ---------- */
+const approaches = [
+ {
+   short:"YouTube Mix (RD radio)",
+   name:"YouTube Mix (RD radio) Auto-Player",
+   oneLiner:"Seed a YouTube \"Mix\" radio (RD&lt;videoId&gt;) from the playing track via yt-dlp --flat-playlist, then append the de-duped, remix-filtered continuations as ephemeral stream items.",
+   simDef:"\"Similar\" = whatever YouTube's own recommendation graph puts in the auto-generated Mix radio seeded by this exact video. Empirically: RD from Rick Astley → 80s pop/disco contemporaries; RD from \"Die With A Smile\" → One Direction, Coldplay, Glass Animals — same genre/mood/era cohort of official videos, NOT slowed+reverb. Genre/mood/artist-cohort via YouTube's collaborative filtering, zero local audio analysis. Opaque (you don't see YT's features) but matches the user's intent far better than metadata strings, and RD mixes overwhelmingly surface canonical official uploads.",
+   findSongs:"<div class='mono-snip'>yt-dlp --flat-playlist --dump-json --no-warnings --ignore-errors \\\n  --playlist-start 2 --playlist-end N \\\n  \"https://www.youtube.com/watch?v=V&amp;list=RDV\"</div><p style='margin-top:8px'>The <code class='inl'>list=RDV</code> URL is YouTube's Mix radio for V. <code class='inl'>--flat-playlist</code> = no per-video hit (25 items ~3.5s cold, verified). <code class='inl'>--playlist-start 2</code> skips the seed itself. Each JSON line has id/title/duration/uploader/thumbnails[] — what entry_to_result/best_thumbnail already parse (the scalar thumbnail is MISSING in flat mode, so the thumbnails[]-array fallback is required). A full RD list is ~357 items; page lazily (~10-20 per top-up). URLs stay lazy via _resolveSrc.</p>",
+   dataFlow:"A new <code class='inl'>autoPlay</code> boolean (persisted in Settings). Top-up fires from <code class='inl'>_onTime</code> — gated on autoPlay ON, repeat≠all/one, and unplayed-ahead ≤ LOW_WATER (~3). A new Rust command <code class='inl'>related_mix(video_id, limit, exclude_ids)</code> shells the RDV flat-playlist call and returns Vec&lt;SearchResult&gt; reusing entry_to_result/best_thumbnail. <code class='inl'>_autoTopUp()</code> calls it with current().videoId. Dedupe set = queue videoIds + a bounded <code class='inl'>_recentlyPlayedVideoIds</code> ring (~200) + library songs{}. Remix filter drops candidates whose normalized title matches the seed core AND contains remix markers. Survivors → resultToStreamItem → addToQueue. A seed cursor (RD URL + last playlist-end) pages deeper on successive top-ups; resets when the seed song changes.",
+   pros:[
+     "Reuses the entire existing pipeline — new surface is one Rust command + one store action.",
+     "Empirically gives genuinely similar songs (verified, two seeds): same genre/mood/era cohort of official videos.",
+     "Avoids the slowed+reverb trap near-free: RD already surfaces canonical uploads, a cheap title regex catches the rare leak.",
+     "No API keys, no ML, no embeddings, no external service — just the bundled yt-dlp.exe.",
+     "Cheap/fast: one flat-playlist request per top-up (~3.5s/25 items); unplayed candidates cost nothing.",
+     "Quality scales with YouTube's recommendation graph — far better than local title/artist strings."
+   ],
+   cons:[
+     "Black box: you can't tune, explain, or guarantee it. Bad mix for a seed → no lever beyond re-seeding.",
+     "Non-music/obscure seeds produce a near-empty mix (Big Buck Bunny's RD returned only the seed). Auto-player silently stalls — needs a fallback.",
+     "RD lists are non-deterministic run-to-run, so cross-session dedupe is mandatory or the user sees the same hits repeatedly.",
+     "yt-dlp/YouTube can break this anytime (extractor changes, bot checks, throttling, region/age gating) — and auto-play makes background YT calls the user didn't initiate.",
+     "Mix radios are popularity-biased: they drift toward mainstream hits, homogenizing a niche playlist into chart-pop within ~15 tracks.",
+     "RDV is the generic per-video mix — it ignores the user's broader taste/library; it only knows the one seed."
+   ],
+   cost:"No money, no keys — runs through the bundled yt-dlp.exe against public YouTube endpoints. Real cost is rate/IP pressure: a flat-playlist request per top-up + a `-g` resolve per played track. Over a long session that's dozens of unattended background requests, raising the odds of YT throttling/bot-challenging this IP (429 / \"confirm you're not a bot\") and degrading the whole app. Mitigate by fetching in batches of ~15-25 and gating on a low-water mark.",
+   reliability:"Strong for mainstream seeds (verified) and naturally sidesteps the slowed+reverb trap. Failure modes: (1) obscure/non-music seed → empty mix → stall (needs an artist/title ytsearch fallback or keep the previous seed). (2) Cross-session repetition if dedupe is weak. (3) Upstream breakage (extractor/throttle/age/region/stale yt-dlp) → must fail soft (log, leave queue, retry next tick, never crash). (4) Genre drift toward mainstream over many top-ups. (5) Dead/region-locked candidates surface at play time via the existing retry-then-skip, so a bad pick is just skipped.",
+   eff:"M",
+   deps:["No new deps — bundled yt-dlp.exe","Depends on the undocumented RD&lt;videoId&gt; Mix URL form staying available","Depends on yt-dlp staying current (existing update_ytdlp covers this)"]
+ },
+ {
+   short:"External metadata (Last.fm)",
+   name:"External metadata radio (Last.fm + MusicBrainz → yt-dlp)",
+   oneLiner:"Identify the playing track via Last.fm/MusicBrainz, pull its \"similar tracks\" / similar-artist top-tracks, then re-resolve each to a real YouTube videoId with the existing yt-dlp search and append as an ephemeral stream item.",
+   simDef:"\"Similar\" = co-listening + tag/genre proximity from Last.fm's collaborative graph (track.getSimilar, artist.getSimilar), optionally refined by shared MB/Last.fm genre tags. A candidate is similar if it's in Last.fm's similar-tracks list (a 0..1 score from \"people who listen to A also listen to B\") OR a top track of a similar artist with overlapping tags. NOT acoustic, NOT title-string similarity — which is why it sidesteps the slowed+reverb trap: Last.fm's graph is keyed on canonical (artist,track) MBIDs scrobbled by real users; slowed/reverb re-uploads aren't scrobbled as distinct tracks, so they never appear. Similarity lives entirely in the service; you never compute it.",
+   findSongs:"<p><b>Three stages.</b> (1) IDENTIFY: the playing item only has dirty YouTube title+artist (\"Artist - Song (Official Video) [4K]\"). Strip junk (parentheticals, \"official video\", \"lyrics\", \"ft.\", emoji), then call track.getInfo/getSimilar; fall back to artist.getSimilar + artist.getTopTracks; MusicBrainz disambiguates ambiguous splits. (2) RANK/FILTER: union the similar tracks, drop already-played/queued, drop seed-equal normalized (artist,title). (3) RE-RESOLVE: for each \"Artist - Title\", call the EXISTING <code class='inl'>search</code> with query \"Artist Title\", pick the top result whose duration is within ~20% of the known length and whose cleaned title fuzzy-matches (rejecting slowed/reverb/sped up/nightcore/8d/remix unless the seed was one) → a real videoId → ephemeral stream item.</p>",
+   dataFlow:"A new <code class='inl'>autoPlayer</code> flag (Settings + toggle). A player-store subscription (mirroring initDiscordPresence) watches index/queue.length; when on and unplayed-ahead &lt; threshold (~3), it tops up. Seed = current() {videoId,title,artist}. A new module <code class='inl'>autoRadio.ts</code> cleans the title and calls Last.fm via a new Rust command <code class='inl'>lastfm_similar</code> (HTTP from Rust with reqwest — keeps the key out of the webview, dodges CORS) returning {artist,title,durationSec,mbid?}. Dedupe = a session Set of normalized \"artist|title\" + used videoIds (seeded from queue + library); the remix denylist regex runs on BOTH the Last.fm title and the resolved YouTube title. Resolve-back via api.search → resultToStreamItem → addToQueue. Append 1-3 at a time so a topic-drift correction is cheap.",
+   pros:[
+     "Reuses every existing primitive unchanged: search → videoId, resolve_stream, resultToStreamItem, addToQueue, lazy _resolveSrc — no new playback machinery.",
+     "Last.fm's collaborative graph gives human-curated genre/mood/artist similarity, and is naturally immune to slowed+reverb (those aren't scrobbled).",
+     "Ephemeral by construction: candidates become {kind:'stream'} items, identical to today's 'play directly' path.",
+     "Last.fm API is free for non-commercial use; one cheap request yields ~50-100 candidates, so top-ups are infrequent.",
+     "Dedupe and the remix denylist are simple, local, inspectable — no ML, no model weights."
+   ],
+   cons:[
+     "Two-hop fragility: Last.fm gives 'Artist - Title' but you still must find THAT on YouTube via a second search, and the top hit is often a slowed/reverb/8D/'audio' re-upload, a topic compilation, or an hour-long mix.",
+     "Identification is the weak link: dirty YouTube titles, and many tracks (regional/obscure/non-scrobbled) aren't in Last.fm, so getSimilar returns empty → coarse artist fallback or outright fail.",
+     "Latency stacks: clean title → Last.fm HTTP → a yt-dlp ytsearch20 spawn per candidate (~1-3s each) → later a -g per item. Must run on a background thread or playback stutters.",
+     "Requires a Last.fm API key: ship YOUR key (ToS-gray, one revocation breaks everyone) or per-user keys (friction, feature dead until set).",
+     "No acoustic/BPM/key matching — 'similar' is only as good as scrobble data; niche seeds drift to loosely-related mainstream.",
+     "Adds a real outbound network dependency to an otherwise local app — offline or Last.fm-down means auto-player silently does nothing."
+   ],
+   cost:"Last.fm: free non-commercial, informal throttling ~a few req/sec — fine at one query per ~3 songs. MusicBrainz: free but 1 req/sec + descriptive User-Agent; only for disambiguation. No per-call money. Real cost is process spawns (ytsearch20 + eventual -g per candidate). Key management is the operational cost: a single embedded key risks revocation killing it for everyone; per-user keys add onboarding friction. Deezer is a keyless fallback but artist-level only and weaker.",
+   reliability:"GOOD for mainstream, well-scrobbled English-language music where the title cleanly yields (artist,track). Degrades sharply for non-scrobbled/niche/regional tracks (empty/artist-only), dirty titles that mis-split, and the back-mapping where the top YouTube hit is a slowed+reverb/8D/nightcore re-upload, compilation, or cover. Failure modes: identification miss → stall (fall back gracefully); back-resolution picks a 1-hour mix/wrong upload (duration-window + denylist catch most); duplicate/loopy if the dedupe set isn't seeded from queue+library; rate-limit/network failure → top-up must be a best-effort no-op. Slowed+reverb is well-handled at the SOURCE but re-introduced at re-resolution, so the resolved-title denylist is load-bearing. Net: good for popular music, unreliable-to-silent for the long tail; back-mapping is the biggest correctness risk.",
+   eff:"L",
+   deps:["Last.fm API account + key (track.getSimilar/getInfo, artist.getSimilar/getTopTracks)","MusicBrainz (optional disambiguation; descriptive User-Agent, 1 req/sec)","reqwest (or similar) in src-tauri for server-side HTTPS (key off the JS bundle, no CORS)","Existing bundled yt-dlp.exe (ytsearch20 back-resolution + -g streaming)","Optional keyless fallback: Deezer API (artist-level only)"]
+ },
+ {
+   short:"Heuristic (local + ytsearch)",
+   name:"Heuristic Auto-Player: candidate queries from local metadata + yt-dlp search",
+   oneLiner:"Derive search queries purely from the current track's artist/title/channel, run them through the existing yt-dlp search, filter out remix/same-song junk and already-seen videos, and append the survivors as ephemeral stream items.",
+   simDef:"\"Similar\" = operationally \"tracks YouTube search returns for queries built from the current song's artist and channel, minus same-song/remix\". No acoustic or genre model. Similarity = shared artist/channel/uploader, plus optional genre-keyword seeding. Seed queries ranked by confidence: (1) \"&lt;artist&gt; mix\" / \"&lt;artist&gt; playlist\" (same-artist radio), (2) \"&lt;artist&gt; type beat\" / \"songs like &lt;title&gt;\" (style-adjacent, lower confidence), (3) \"more from &lt;channel&gt;\" when artist≠channel. So \"similar\" ≈ same-artist-or-channel neighborhood per YouTube relevance. The slowed+reverb trap is NOT defined out by scoring (these ARE returned by \"&lt;artist&gt; mix\") — it's removed by an explicit blocklist filter.",
+   findSongs:"<p>Reuses the EXISTING <code class='inl'>search</code> command (ytsearch20 + --flat-playlist) via api.search — no new Rust for the happy path. Flow: read current() artist/title → a new <code class='inl'>buildSeedQueries(item)</code> in <code class='inl'>autoPlayer.ts</code> makes 2-4 query strings (normalizing artist by stripping \"VEVO\", \"- Topic\", \"Official\", trailing \"(Official Video)\"). For each, api.search → SearchResult[]. Run each candidate through <code class='inl'>isLikelyRemix</code>:</p><div class='mono-snip'>/\\b(slowed|reverb(ed)?|sped\\s*up|nightcore|8d|\n   bass\\s*boosted|remix|mashup|loop|1\\s*hour|extended)\\b/i</div><p style='margin-top:8px'>+ drop near-duplicate titles (token-overlap vs seed &gt;~0.8 = same song re-uploaded) + drop durations &lt;60s or &gt;12min. Dedupe against a persistent Set&lt;videoId&gt; of everything auto-queued this session + all queue videoIds. Top N survivors → resultToStreamItem → addToQueue. No download.</p>",
+   dataFlow:"Toggle <code class='inl'>autoPlay</code> (player-store boolean mirrored from a Settings toggle). A new <code class='inl'>_maybeRefill()</code> is called from inside <code class='inl'>_onTime</code> — when autoPlay is on and unplayed-after-index drops below ~3, it fires once (guarded by a <code class='inl'>_refilling</code> flag). buildSeedQueries(current()) → loops api.search. Dedupe: <code class='inl'>_seenVideoIds: Set&lt;string&gt;</code> seeded with queue videoIds; isLikelyRemix runs first, then _seenVideoIds.has() drops repeats; survivors' ids are added BEFORE append so concurrent refills don't re-add. resultToStreamItem → addToQueue (keeps naturalOrder in sync). Touches: playerStore.ts (autoPlay, _seenVideoIds, _refilling, _maybeRefill, toggleAutoPlay, _onTime hook), NEW autoPlayer.ts (buildSeedQueries, normalizeArtist, stripTitleNoise, isLikelyRemix, tokenOverlap), Settings toggle. Optional Rust: a search_related command using the real RD radio endpoint (see cons).",
+   pros:[
+     "Reuses 100% of existing infrastructure: search, resultToStreamItem, addToQueue, lazy _resolveSrc, and the expiry retry all already work for ephemeral items.",
+     "Zero new external dependencies, zero API keys, zero added cost beyond extra yt-dlp invocations the app already shells out for.",
+     "Fully offline-of-third-party-APIs: no Last.fm/Spotify/MusicBrainz account, no rate-limit headaches, nothing to break when a key expires.",
+     "The remix/slowed+reverb problem is directly addressable with a transparent, tweakable regex blocklist + title-similarity dedupe — the user can see exactly why something was filtered.",
+     "Ephemeral by construction — appended items never touch download_song or the library."
+   ],
+   cons:[
+     "'Similarity' is shallow: \"&lt;artist&gt; mix\" mostly yields MORE OF THE SAME ARTIST, not genre/mood neighbors. True cross-artist 'feels similar' is weak-to-absent — YouTube text relevance isn't a recommender.",
+     "--flat-playlist returns NO genre/tags/categories — the 'mine yt-dlp tags' premise is mostly false; you'd only get tags by re-fetching each candidate WITHOUT --flat-playlist (slow, more requests, more bot-detection risk). Genre keywords must come from parsing artist/title.",
+     "Artist field is unreliable (uploader/channel): often 'T-Series', 'SonyMusicIndiaVEVO', or 'Artist - Topic' — query quality degrades and normalizeArtist only partially fixes it.",
+     "The remix filter is a blocklist arms race: new phrasings ('softened', 'underwater', 'lofi flip') slip through; legit songs with 'Remix' in the official title get wrongly dropped.",
+     "Each refill spawns multiple yt-dlp processes (one per seed query, ~1-3s each); on a slow connection this lags playback and burst searching raises 429/bot-detection risk that can poison BOTH auto-play and normal search."
+   ],
+   cost:"No money, no keys. Cost is process/bandwidth: each refill = 2-4 ytsearch20 invocations (metadata only) + one -g per track at play time (already incurred today). Main hidden cost is YouTube rate-limiting: bursty automated searches every few minutes across a long session can trigger 429s / \"confirm you're not a bot\", degrading the whole app's search. Mitigate by caching seed-query results, throttling to one refill per N minutes, and requesting fewer than 20 results.",
+   reliability:"Mechanical reliability (find, filter, append, stream) is HIGH — it leans on shipping code paths. SEMANTIC reliability (genuinely similar in genre/mood?) is LOW-to-MEDIUM: a clean well-known artist gives a believable same-artist radio; compilation channels, '- Topic' uploads, or transliterated names collapse query quality. Failure modes: artist is a label/aggregator → garbage queries; 429 mid-session → empty refills + possibly broken main search; blocklist false-negatives let slowed+reverb through OR false-positives drop legit tracks; same-artist tunnel vision (rarely escapes the seed artist); URL expiry is already handled by _onPlaybackError. Net: a solid 'more like this artist' autoplay, an unreliable 'genre/mood radio'.",
+   eff:"M",
+   deps:["None beyond the bundled yt-dlp.exe (ffmpeg/ffprobe already present). No new crates or JS libs — a tiny token-overlap/Levenshtein can be hand-written in autoPlayer.ts."]
+ },
+ {
+   short:"Audio fingerprint (DSP)",
+   name:"Audio-content / signal-based similarity",
+   oneLiner:"Decode the playing audio with bundled ffmpeg, reduce it to a compact acoustic descriptor (tempo, key, MFCC/chroma, optional embedding), then score a pool of yt-dlp candidates by the SAME descriptor and pick the nearest — rejecting same-song remixes by content distance, not title text.",
+   simDef:"\"Similar\" = small distance in an acoustic feature vector per track: (a) tempo (BPM) + stability, (b) key/mode via a 12-bin chroma profile, (c) timbre = mean+variance of ~13 MFCCs, (d) spectral centroid/rolloff/ZCR (brightness/energy), optional (e) a 100-200d embedding from a bundled ONNX model (OpenL3/MusicNN-style). Z-normalize → cosine/Euclidean distance. Genre/mood/style is approximated by timbre+rhythm+harmony — songs that FEEL alike (energy, brightness, tempo band, tonality) land near each other. This is also how the slowed+reverb trap is caught: a slowed+reverb edit has near-identical chroma/MFCC shape but markedly lower tempo and a smeared reverb-elevated spectrum → flagged as 'basically the same recording' and rejected, or dropped on tempo. Rejection by measured audio, not title parsing.",
+   findSongs:"<p><b>The brutal crux:</b> content analysis can SCORE candidates but cannot GENERATE them — there's no acoustic-search index of YouTube. So it's two-stage and the pool STILL comes from yt-dlp. (1) Build a candidate pool from metadata: ytsearch by artist + genre/mood seed terms; optionally harvest YouTube's own Mix/related via a <code class='inl'>RD&lt;videoId&gt;</code> radio URL with --flat-playlist (already acoustically-related, far better than blind search). (2) For the current track AND each candidate, decode with ffmpeg to mono 16kHz PCM, compute the descriptor, rank by distance, append the nearest non-duplicate as a stream item.</p><div class='mono-snip'>ffmpeg -ss 30 -t 30 -i &lt;url&gt; -ac 1 -ar 16000 -f f32le -</div><p style='margin-top:8px'>The analysis is a RE-RANKER + same-song REJECTOR layered on yt-dlp discovery, not a discovery engine.</p>",
+   dataFlow:"Trigger: autoPlay ON + queue low (detected in _onTime/next when index ≥ queue.length − N). A new <code class='inl'>api.autoSuggest(seed)</code> Tauri command (new <code class='inl'>autoplay.rs</code>) builds the pool: run yt-dlp on RD&lt;videoId&gt; with --flat-playlist (reusing entry_to_result) + an ytsearch-by-artist fallback. Feature extraction for the SEED: resolve its cached googlevideo URL, pipe a 30s middle slice through ffmpeg, compute the descriptor in Rust (rustfft + hand-rolled chroma/MFCC/tempo, or aubio bindings). For each candidate: resolve → ffmpeg-decode 30s → descriptor → distance. To bound cost, only analyze the top ~5-8 candidates from the Mix list. Dedupe by videoId (queue + a rolling autoPlayHistory Set) + drop candidates whose descriptor distance is BELOW a 'too identical' floor (same recording / slowed+reverb) AND chroma-near (same song); + title-normalized prefilter. Winner → resultToStreamItem → addToQueue. PCM is a transient buffer; nothing is downloaded.",
+   pros:[
+     "Genuinely content-aware: rejects a slowed+reverb/nightcore edit by measured tempo/spectral difference instead of brittle title keywords — the exact failure the user called out.",
+     "ffmpeg/ffprobe are ALREADY bundled and wired (setup.rs, used by download_song) — no new heavyweight binary for the decode.",
+     "Reuses plumbing end-to-end: yt-dlp search/Mix parsing, resolve_stream, resultToStreamItem, addToQueue. Ephemeral, no-download contract preserved (transient PCM, never a saved file).",
+     "Works offline-of-recommendation-APIs: no third-party service, no key, no per-call billing.",
+     "The descriptor doubles as a same-recording detector — a principled dedupe knob, not a regex blocklist."
+   ],
+   cons:[
+     "Latency is the killer: ranking means resolve AND partially fetch/decode 30s for EACH of ~5-8 candidates plus the seed. Each resolve is a yt-dlp process; each ffmpeg slice pulls real bytes. Realistically 15-60s+ to pick ONE next song — far slower than the music plays unless you prefetch many tracks ahead (multiplying cost).",
+     "Content analysis does NOT solve discovery: the pool STILL comes from text search / the Mix list. The headline 'how to FIND similar' is mostly answered by the Mix order; the expensive DSP adds marginal lift over just using that order.",
+     "Real DSP in Rust: no existing crate does this; add rustfft + hand-rolled chroma/MFCC/tempo, or risky native bindings (aubio/essentia) that complicate the Windows bundle. An ONNX embedding means shipping onnxruntime + a model (tens-hundreds of MB) and a first-run download.",
+     "Decoding a remote googlevideo URL with ffmpeg can stall or 403 (URLs expire ~6h); each failed candidate wastes its whole resolve+fetch budget.",
+     "Tempo/MFCC/chroma correlate only loosely with 'genre/mood/style': two 120-BPM A-minor bright-timbre songs may be totally different vibes. Expect mediocre, sometimes baffling picks for the cost.",
+     "Heavy CPU/network while music plays: spawning multiple ffmpeg+yt-dlp processes can cause audio stutter and fan spin — exactly when the user wants smooth background listening."
+   ],
+   cost:"No API money, no key — discovery rides the free yt-dlp pipeline. Real cost is COMPUTE + BANDWIDTH per suggestion: ~6-9 extra yt-dlp resolves + ~30s of audio fetched+decoded per candidate, every time the queue needs a song. Meaningful background data + CPU. An ONNX model adds a one-time ~50-300MB download (new setup step) and a larger installer. Higher yt-dlp request volume modestly raises throttling risk.",
+   reliability:"Medium-low for surfacing 'genuinely similar', and structurally so: most real quality comes from the RD&lt;videoId&gt; candidate pool, NOT the acoustic re-ranking. The descriptor reliably does ONE thing well — catch/reject same-recording / slowed+reverb edits by tempo+spectral divergence — exactly the user's pain. Beyond that, tempo/key/timbre distance is a weak proxy for mood/genre/style and will sometimes pick acoustically-near but vibe-wrong tracks. Failure modes: expired/403 URLs make candidates un-analyzable (wasted budget); latency forces aggressive prefetch or the queue runs dry; thin/empty Mix for obscure seeds collapses the pool to noisy search; CPU contention stutters playback; instrumentation tracks give misleading 30s-slice descriptors. Net: a defensible same-song REJECTOR and a marginal re-ranker, not a strong standalone 'find similar' engine.",
+   eff:"XL",
+   deps:["Bundled ffmpeg/ffprobe (already present) for decoding to PCM","A Rust DSP path: rustfft + hand-written chroma/MFCC/tempo, OR native bindings (aubio/essentia) that complicate the Windows build","OPTIONAL: onnxruntime crate + a small bundled audio-embedding model (OpenL3/MusicNN-style), plus a first-run model download akin to install_ffmpeg","Existing yt-dlp sidecar for the candidate pool (search / RD-mix) and resolve_stream"]
+ },
+ {
+   short:"LLM-suggested (Claude)",
+   name:"LLM-Suggested Similar Tracks (Claude → yt-dlp resolve)",
+   oneLiner:"When the queue runs low, send the current track's title/artist to Claude (Haiku 4.5), ask for N genuinely-similar songs by genre/mood/artist-style, then resolve each through the existing yt-dlp ytsearch and append as an ephemeral stream item.",
+   simDef:"\"Similar\" = whatever Claude judges a good radio-style neighbor along genre, mood/energy, era, and artist-adjacency — NOT another rendering of the same song. The model holds an implicit 'fans of X also like' map, so similarity is semantic/cultural, not acoustic. The prompt explicitly forbids the trap: no remixes, no slowed+reverb/sped up/nightcore/8D/bass boosted, no covers, no live/acoustic versions of the SAME song, no same-artist variant of the seed. It must return DISTINCT songs (different title, ideally a spread of artists) a human curating a 'for fans of this' playlist would pick. Recent-history + already-queued titles are passed in-band so the model knows what to avoid.",
+   findSongs:"<p><b>Two stages.</b> (1) DISCOVERY via LLM: one Claude Messages API call with strict structured output (output_config.format json_schema, strict:true) returning {title, artist, reason}[]. The model is the entire candidate-generation engine — it names real songs from training knowledge. (2) RESOLUTION via the existing backend: for each suggestion build \"{artist} {title}\", call the existing <code class='inl'>search</code> (ytsearch20), take the top sane result, and turn it into an ephemeral item via resultToStreamItem. Playback is unchanged: source {kind:'stream',videoId,url:''}, URL lazily resolved by _resolveSrc via resolve_stream. Nothing is downloaded.</p>",
+   dataFlow:"A new <code class='inl'>autoPlay</code> boolean (player UI toggle). A subscriber (in initPlayer or an effect) watches index/queue.length; when on and upcoming (queue.length−index−1) drops below ~2, it fires <code class='inl'>_topUpAutoPlay()</code> (in-flight guarded). It reads seed = current() {title,artist} + a dedupe context (last ~15 played titles + all queued titles). It calls a new Rust command <code class='inl'>suggest_similar</code> in <code class='inl'>llm.rs</code> (registered in lib.rs) so ANTHROPIC_API_KEY lives in the Rust process, never the webview — one messages.create (model claude-haiku-4-5, max_tokens ~1024, strict json_schema) returning Vec&lt;{title,artist}&gt;. Dedupe filters drop matches of recent-history, queued titles, the seed, and a remix-keyword regex (belt-and-suspenders). Then api.search(\"{artist} {title}\"), pick results[0] (optionally reject implausible duration / blocklist title), resultToStreamItem → addToQueue (handles naturalOrder + empty-queue). New items behave identically for crossfade/shuffle/repeat/error-skip.",
+   pros:[
+     "Targets the real ask: 'similar by genre/mood/artist style, not a reverbed version' is exactly what an LLM is good at, and the prompt can forbid the slowed+reverb trap explicitly.",
+     "Almost no new backend surface: reuses search, resolve_stream, resultToStreamItem, addToQueue verbatim. The only genuinely new code is one Claude call.",
+     "No audio fingerprinting, no embeddings DB, no training — the hard part (finding candidates) is offloaded to a model that already encodes taste adjacency.",
+     "Cross-artist variety is natural — the model spreads across artists, what 'auto radio' should feel like, unlike same-artist heuristics.",
+     "Cheap/low-volume: top-ups are infrequent, so token spend is trivial.",
+     "Reason strings are free explainability ('both dream-pop / 2010s') for a UI tooltip if wanted."
+   ],
+   cons:[
+     "Hallucination: the model can invent a song/artist or mis-attribute a title. yt-dlp search will resolve to SOMETHING (YouTube always returns results), so a bad suggestion silently becomes a wrong/garbage track rather than an error.",
+     "Resolution mismatch: even for a real song, ytsearch top result may be a lyric video, cover, 1-hour loop, a 'slowed+reverb' upload (the thing the user hates), or karaoke. The prompt can't control YouTube's catalog; only imperfect post-filtering can.",
+     "Adds an external dependency + API key (network + cost + key to secure) to an otherwise local app. Auto-player won't work offline at all.",
+     "Repetition/staleness: across many top-ups the model converges on the same canonical neighbors of a popular seed; needs the avoid-list every call, and can still loop.",
+     "Latency: a Claude call (~1-2s) + N yt-dlp searches (~1-3s each) means a top-up can take several seconds; must run ahead of time (threshold-based) so it never blocks playback.",
+     "Two failure layers compound: 5 names → maybe 4 real → maybe 3 resolve correctly. Yield per call is lossy — request more than you need (ask for 8 to net ~4)."
+   ],
+   cost:"Model: claude-haiku-4-5 at $1.00/$5.00 per M input/output tokens. A top-up (seed + avoid-list + schema) is well under ~1K input / ~300-500 output for 8 suggestions → ~$0.002-0.004 per top-up. Even heavy listening is cents/day. Upgrade to claude-sonnet-4-6 ($3/$15) only if Haiku feels weak (likely unnecessary). yt-dlp: free, but one ytsearch spawn per suggestion + one -g at play time (CPU/network, not money). API key: store ANTHROPIC_API_KEY in the Rust process, NOT the React bundle (a webview-shipped key is trivially extractable); a new suggest_similar command is the clean boundary. If the user supplies their own key, a Settings field writes to the Rust side only.",
+   reliability:"GOOD on the dimension the user cares about (genre/mood/artist-adjacency) — an LLM strength — and the slowed+reverb trap is directly suppressible in the prompt AND a keyword blocklist on both suggestion and resolved-title sides. The weak link is RESOLUTION, not discovery: ytsearch returns whatever YouTube has, so a correct suggestion can still land on a remix/cover/lyric-video/hour-loop. Mitigations: request more than needed and over-filter; reject resolved results with remix/reverb/nightcore/'1 hour'/cover/karaoke keywords or wildly-off duration; prefer 'Topic'/official-artist uploader channels (already in entry_to_result). Failure modes: occasional hallucinated track that resolves to the wrong song (silently wrong); convergence/repetition on popular seeds (mitigated by the avoid-list); total failure offline or on a bad/empty key (degrade gracefully — log + stop topping up, never crash). Net: reliable enough to feel like a real 'similar songs radio', with a minority of off-target tracks the user can skip.",
+   eff:"M",
+   deps:["Anthropic Claude Messages API (model claude-haiku-4-5) — requires ANTHROPIC_API_KEY + network","An HTTP client in the Rust backend (e.g. reqwest) to call the API from src-tauri (key off the webview)","Existing bundled yt-dlp.exe sidecar for ytsearch resolution + stream resolution — no new binary"]
+ },
+];
+
+const EFFLBL={L:"Low",M:"Medium",XL:"Very High"};
+function renderApproaches(){
+  const host=document.getElementById('appcards');
+  approaches.forEach((a,i)=>{
+    host.insertAdjacentHTML('beforeend',`
+      <div class="card appcard">
+        <div class="app-head">
+          <div>
+            <p class="app-name">${String.fromCharCode(65+i)} · ${a.name}</p>
+            <p class="app-oneliner">${a.oneLiner}</p>
+          </div>
+          <div class="pill-row" style="flex-direction:column;align-items:flex-end">
+            <span class="pill">Effort <b class="eff eff-${a.eff}">${a.eff}</b> · ${EFFLBL[a.eff]}</span>
+          </div>
+        </div>
+
+        <div class="app-section"><h4>How "similar" is defined</h4><p>${a.simDef}</p></div>
+        <div class="app-section"><h4>Mechanism — how it finds songs</h4>${a.findSongs}</div>
+        <div class="app-section"><h4>Data flow into the live queue</h4><p>${a.dataFlow}</p></div>
+
+        <div class="proscons">
+          <div class="pc pros"><h4>Pros</h4><ul>${a.pros.map(p=>`<li>${p}</li>`).join('')}</ul></div>
+          <div class="pc cons"><h4>Cons</h4><ul>${a.cons.map(p=>`<li>${p}</li>`).join('')}</ul></div>
+        </div>
+
+        <div class="meta-row">
+          <div class="pc"><h4>Cost</h4><p style="font-size:12.8px;color:var(--muted);margin:0">${a.cost}</p></div>
+          <div class="pc"><h4>Reliability</h4><p style="font-size:12.8px;color:var(--muted);margin:0">${a.reliability}</p></div>
+        </div>
+        <div class="app-section"><h4>External dependencies</h4>
+          <div class="pc"><ul class="deps" style="position:relative">${a.deps.map(d=>`<li>${d}</li>`).join('')}</ul></div>
+        </div>
+      </div>`);
+  });
+}
+
+/* ---------- MATRIX ---------- */
+const matrixRows = [
+ ["Similarity definition", [
+   "YouTube's own Mix/radio graph (collaborative filtering) — genre/mood/era cohort, opaque",
+   "Last.fm co-listening + tag/genre graph — human-scrobbled, not acoustic/title",
+   "Same-artist/channel neighborhood per YouTube text-search relevance — shallow",
+   "Acoustic feature distance (tempo/key/MFCC/chroma) — re-ranks a yt-dlp pool",
+   "LLM's cultural 'fans of X also like' map — semantic, cross-artist"
+ ]],
+ ["Mechanism", [
+   "yt-dlp RD&lt;videoId&gt; --flat-playlist → append",
+   "Last.fm getSimilar → re-resolve each on YouTube via ytsearch",
+   "buildSeedQueries → existing ytsearch → filter",
+   "Build pool (RD-mix/search) → ffmpeg-decode 30s → score by descriptor",
+   "Claude Messages call → ytsearch-resolve each name"
+ ]],
+ ["New backend command", [
+   "<span class='tick-mid'>1 new</span> related_mix(videoId)",
+   "<span class='tick-mid'>1 new</span> lastfm_similar (reqwest)",
+   "<span class='tick-good'>0</span> reuses search (optional RD command)",
+   "<span class='tick-bad'>1 new</span> autoSuggest + Rust DSP",
+   "<span class='tick-mid'>1 new</span> suggest_similar (reqwest+Claude)"
+ ]],
+ ["Avoids slowed+reverb trap", [
+   "<span class='tick-good'>Strong</span> RD surfaces canonical uploads + cheap regex",
+   "<span class='tick-good'>Strong at source</span> (not scrobbled); <span class='tick-mid'>weak at re-resolve</span>",
+   "<span class='tick-bad'>Weak</span> — relies entirely on a blocklist arms race",
+   "<span class='tick-good'>By measurement</span> — rejects same-recording edits by tempo/spectrum",
+   "<span class='tick-mid'>Prompt-forbidden + blocklist</span>; <span class='tick-mid'>re-resolve can leak</span>"
+ ]],
+ ["Cost (money / compute)", [
+   "Free; IP/rate pressure from background YT calls",
+   "Free API (key); process spawns for re-resolve",
+   "Free; bursty ytsearch → 429 risk",
+   "Free API; heavy CPU+bandwidth per pick; optional 50-300MB model",
+   "~$0.002-0.004/top-up (Haiku); + ytsearch spawns"
+ ]],
+ ["Reliability / quality", [
+   "<span class='tick-good'>High</span> for mainstream; stalls on obscure seeds",
+   "<span class='tick-mid'>Good for popular</span>; silent for long tail; back-map is the risk",
+   "<span class='tick-bad'>Low-med</span> 'more like this artist', not genre radio",
+   "<span class='tick-bad'>Med-low</span> same-song rejector, marginal re-ranker",
+   "<span class='tick-mid'>Good genre/mood</span>; hallucination + resolution mismatch"
+ ]],
+ ["External deps", [
+   "<span class='tick-good'>None</span> beyond bundled yt-dlp",
+   "Last.fm key + reqwest; opt MusicBrainz/Deezer",
+   "<span class='tick-good'>None</span> beyond bundled yt-dlp",
+   "ffmpeg (have) + rustfft/aubio; opt onnxruntime + model",
+   "Anthropic API + key + reqwest"
+ ]],
+ ["Offline behavior", [
+   "Needs YouTube (always did)",
+   "<span class='tick-bad'>Dead</span> if Last.fm/network down",
+   "Needs YouTube (always did)",
+   "Needs YouTube for the pool (always did)",
+   "<span class='tick-bad'>Dead</span> offline / bad key"
+ ]],
+ ["Effort", [
+   "<span class='eff eff-M'>M</span>","<span class='eff eff-L'>L</span>","<span class='eff eff-M'>M</span>","<span class='eff eff-XL'>XL</span>","<span class='eff eff-M'>M</span>"
+ ]],
+];
+function renderMatrix(){
+  const t=document.getElementById('matrix');
+  const head=`<thead><tr><th style="min-width:160px">Axis</th>${approaches.map((a,i)=>
+    `<th class="apphdr">${String.fromCharCode(65+i)} · ${a.short}<small>${a.name.replace(/&amp;/g,'&')}</small></th>`).join('')}</tr></thead>`;
+  const body=`<tbody>${matrixRows.map(r=>
+    `<tr><th>${r[0]}</th>${r[1].map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody>`;
+  t.innerHTML=head+body;
+}
+
+/* ---------- DECISIONS ---------- */
+const decisions = [
+ {q:"Where does \"similar\" come from?", body:"The single load-bearing choice. Each option needs a different new backend command and has very different cost/quality.", opts:[
+   ["YT Mix/radio (RD&lt;videoId&gt;)","genre/mood neighbors ordered by YouTube, avoids remix clones, no keys — but opaque and popularity-biased."],
+   ["External metadata (Last.fm/MusicBrainz/Deezer)","human-curated graph, immune to remixes at source — but needs a key and a fragile YouTube re-resolution hop."],
+   ["Heuristic ytsearch on artist/title/channel","zero new deps, transparent filter — but mostly same-artist, surfaces remixes, query quality collapses on bad uploader names."],
+   ["Audio-feature analysis via ffprobe/ffmpeg","content-aware same-song rejection — but XL effort, heavy latency/CPU, and only a marginal re-ranker over the Mix order."],
+   ["LLM (Claude Haiku)","strong cross-artist genre/mood radio, prompt-forbids remixes — but hallucination + a lossy resolution step + an API key."]
+ ], srcs:["ytdlp.rs search","types.ts Song/SearchResult (no genre)","api.ts"]},
+
+ {q:"repeat='all' vs infinite auto-play — which wins at end-of-queue?", body:"Both features claim the 'end of queue' moment. repeat=all loops the same finite set; auto-play wants an ever-growing new stream. One must be explicitly subordinated, or they fight.", opts:[
+   ["Auto-play forces repeat off","clean infinite radio, but silently overrides a user setting."],
+   ["repeat=all wins, suppress appending","predictable, but auto-play silently does nothing while looping."]
+ ], srcs:["playerStore.ts next() L182-197"]},
+
+ {q:"Are auto-appended tracks exempt from shuffle?", body:"With shuffle on, next()'s reshuffle and toggleShuffle reorder the WHOLE queue including appended songs, destroying the curated 'what comes next' ordering. naturalOrder would need to track appended items.", opts:[
+   ["Exempt — append strictly after current, never reshuffle","preserves the curated vibe order."],
+   ["Fold into the shuffle pool","consistent with existing shuffle semantics but scrambles the radio order."]
+ ], srcs:["playerStore.ts L185-189, toggleShuffle L244-290"]},
+
+ {q:"How is the remix / slowed+reverb exclusion enforced?", body:"videoId dedup only catches exact re-uploads, not title-variant remixes. Title/artist-level dedup exists nowhere and must be built — and the field labeled 'artist' is really the YouTube uploader.", opts:[
+   ["Title-string denylist (slowed/reverb/remix/nightcore/8d…)","transparent, tweakable — but an arms race with false positives/negatives."],
+   ["Title-similarity vs recently-played + videoId dedup at append time","catches same-song re-uploads; needs a content-stable 'seen' set since item.key isn't."],
+   ["Source-level immunity (RD-mix / Last.fm) + light filter","lean on the source already being clean."]
+ ], srcs:["playback.ts key L3-4","playerStore removeSongFromQueue L317-322"]},
+
+ {q:"Trigger policy & look-ahead — when and how far to top up?", body:"Proactive prefetch in _onTime (needed for seamless crossfade — the next item must exist before the ~5s fade arm) vs lazy on next() finding the queue empty (risks a silent gap and breaks synchronous next()). Plus: how many to keep buffered, and a cap on total growth.", opts:[
+   ["Append N ahead in _onTime when unplayed-ahead ≤ M","seamless, fits the existing pattern; must debounce per-tick + guard with an in-flight flag."],
+   ["Lazy on queue-empty","simplest, but a silent gap and a synchronous-next() rewrite."],
+   ["Cap total queue growth + prune played ephemeral items","bounds memory/UI and the whole-queue-failed guard."]
+ ], srcs:["playerStore.ts _onTime L388","_startCrossfade L409-463"]},
+
+ {q:"Does enabling auto-play detach playingPlaylistId?", body:"Appending ephemeral songs into a queue that still points at playlist X makes the QueuePanel header and Discord presence ('Playlist: X' / 'Looping X') mislabel tracks not in X, and interleaves with libraryStore's playlist→queue mirror on edits.", opts:[
+   ["Detach (null / 'Auto Mix' sentinel)","stops mislabeling and mirror interference; loses the source-playlist label."],
+   ["Keep, but relabel presence","preserves origin context but still claims a playlist that drifted."]
+ ], srcs:["discordPresence.ts L31-34","discord.rs L263-266","libraryStore L147-170"]},
+
+ {q:"Bound the failure / error-skip behavior", body:"The whole-queue-failed guard (failures ≥ queue.length) is sized to a finite queue; an ever-growing auto-queue makes 'all sources dead' effectively never trip, risking an infinite error→next loop on a run of expired/dead ephemeral URLs. The one-shot stream-retry also re-resolves per item.", opts:[
+   ["A dedicated auto-player failure budget","skip-and-fetch-another rather than counting toward the all-dead stop."],
+   ["Proactive URL refresh for long sessions","handles the ~6h expiry across multi-hour unattended runs."]
+ ], srcs:["playerStore.ts _onPlaybackError L465-494 (L488 guard)"]},
+
+ {q:"Persist the auto-player state? Where does the toggle live?", body:"On/off + tuning fits cleanly into Settings (forward-compatible loadAll merge) and would mirror into the player store like crossfade. But it's a per-session playback control — Settings, NowPlayingBar, QueuePanel, or its own view? And ephemeral appended songs must NEVER persist.", opts:[
+   ["Persisted Settings (survives restart, mirrored like crossfade)","durable default; needs load()+setSettings wiring or it's ignored at startup."],
+   ["Live UI state (uiStore/playerStore, resets per session)","matches 'per-session radio'; no restart persistence."],
+   ["Live toggle in NowPlayingBar (infinity/radio button)","most discoverable; needs its own fetch-in-progress indicator (loadingStream is global)."],
+   ["Dedicated 'Radio/Auto' view","seed selection + source config — extends the uiStore View union + Sidebar NAV."]
+ ], srcs:["types.ts Settings L38-46","libraryStore DEFAULT_SETTINGS / setSettings","persist.ts loadAll","NowPlayingBar L56-91"]},
+
+ {q:"How are ephemeral auto-tracks surfaced & managed in the queue UI?", body:"QueueRow renders stream and local items identically; PlaybackItem carries no 'auto-added'/'ephemeral' provenance. The user can't tell which tracks vanish, and there's no action to keep/download a good suggestion.", opts:[
+   ["Add an autoAdded/ephemeral flag + badge/dim/divider","visible distinction; small PlaybackItem + QueueRow change."],
+   ["'Keep / download' action on ephemeral rows","promote a good pick into the library (none exists; streams have no songId)."],
+   ["Auto-prune played ephemeral items + a 'clear auto songs' control","bounds growth and clutter."]
+ ], srcs:["QueuePanel.tsx QueueRow L25-83","PlaybackItem types.ts L52-62"]},
+
+ {q:"Seed: drifting radio or fixed seed?", body:"Append from the CURRENTLY PLAYING song each time (a drifting radio, similarity recomputed per advance) or from a fixed initial seed? Affects how often the new backend command runs and how the mix evolves.", opts:[
+   ["Drift — re-seed from current() each top-up","follows the listener; can wander away from the start vibe."],
+   ["Fixed — seed once when auto-play turns on","stays on-theme; can feel stale over a long session."],
+   ["Rolling window of recent tracks","a compromise; shapes the backend call differently."]
+ ], srcs:["playerStore.ts current()"]},
+];
+function renderDecisions(){
+  const host=document.getElementById('decisions');
+  decisions.forEach((d,i)=>{
+    const opts=d.opts?`<div class="opts">${d.opts.map(o=>`<div class="opt"><b>${o[0]}</b><span>— ${o[1]}</span></div>`).join('')}</div>`:'';
+    const srcs=d.srcs?`<div class="tag-srcs">${d.srcs.map(s=>`<span>${s}</span>`).join('')}</div>`:'';
+    host.insertAdjacentHTML('beforeend',
+      `<details class="decision"${i===0?' open':''}>
+        <summary><span class="qn">${i+1}</span><span>${d.q}</span></summary>
+        <div class="qbody">${d.body}${opts}${srcs}</div>
+      </details>`);
+  });
+}
+
+renderSubsystems2();
+renderApproaches();
+renderMatrix();
+renderDecisions();
+</script>
+</body>
+</html>

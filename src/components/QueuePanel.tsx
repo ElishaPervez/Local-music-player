@@ -10,6 +10,7 @@ import {
   ListX,
   AudioLines,
   Download,
+  PlayCircle,
 } from "lucide-react";
 import {
   DndContext,
@@ -157,6 +158,7 @@ function QueueRow({
 export default function QueuePanel() {
   const queue = usePlayerStore((s) => s.queue);
   const index = usePlayerStore((s) => s.index);
+  const oneOffItem = usePlayerStore((s) => s.oneOffItem);
   const shuffle = usePlayerStore((s) => s.shuffle);
   const shuffleTick = usePlayerStore((s) => s.shuffleTick);
   const reorderQueue = usePlayerStore((s) => s.reorderQueue);
@@ -291,6 +293,19 @@ export default function QueuePanel() {
         </div>
       )}
 
+      {oneOffItem && (
+        <div className="queue-once" aria-live="polite">
+          <span className="queue-once-icon">
+            <PlayCircle size={15} />
+          </span>
+          <span className="queue-once-copy">
+            <b>Playing once</b>
+            <span title={oneOffItem.title}>{oneOffItem.title}</span>
+          </span>
+          <span className="queue-once-note">Queue resumes after</span>
+        </div>
+      )}
+
       {queue.length === 0 ? (
         <div className="queue-empty">
           <ListVideo size={32} />
@@ -313,7 +328,7 @@ export default function QueuePanel() {
                   key={item.key}
                   item={item}
                   index={i}
-                  isCurrent={i === index}
+                  isCurrent={!oneOffItem && i === index}
                 />
               ))}
             </SortableContext>

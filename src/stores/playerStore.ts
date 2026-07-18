@@ -134,9 +134,18 @@ function peekNextIndex(
   return repeat === "all" ? 0 : null;
 }
 
+interface OneOffResume {
+  itemKey: string | null;
+  index: number;
+  position: number;
+  wasPlaying: boolean;
+}
+
 interface PlayerState {
   queue: PlaybackItem[];
   index: number;
+  /** A temporary song playing outside the queue. */
+  oneOffItem: PlaybackItem | null;
   isPlaying: boolean;
   position: number;
   duration: number;
@@ -198,6 +207,10 @@ interface PlayerState {
   _autoRetryTimer: ReturnType<typeof setTimeout> | null;
   /** VideoIds of downloaded library songs, mirrored from libraryStore. */
   _libraryVideoIds: string[];
+  /** Where the queue should continue after a temporary song finishes. */
+  _oneOffResume: OneOffResume | null;
+  /** A saved queue timestamp applied after its audio source is loaded again. */
+  _resumePosition: number | null;
 
   current: () => PlaybackItem | null;
 
@@ -211,6 +224,7 @@ interface PlayerState {
     playlistId?: string | null,
   ) => Promise<void>;
   playNow: (item: PlaybackItem) => Promise<void>;
+  playOnce: (item: PlaybackItem) => Promise<void>;
   addToQueue: (item: PlaybackItem) => void;
   togglePlay: () => void;
   next: () => void;
@@ -231,6 +245,7 @@ interface PlayerState {
   removeFromQueue: (key: string) => void;
   removeSongFromQueue: (songId: string) => void;
   clearQueue: () => void;
+  _finishPlayOnce: () => Promise<void>;
 
   _load: () => Promise<void>;
   _autoTopUp: () => Promise<void>;
@@ -244,6 +259,7 @@ interface PlayerState {
 export const usePlayerStore = create<PlayerState>((set, get) => ({
   queue: [],
   index: -1,
+  oneOffItem: null,
   isPlaying: false,
   position: 0,
   duration: 0,
@@ -274,9 +290,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   _deadSeeds: new Set<string>(),
   _autoRetryTimer: null,
   _libraryVideoIds: [],
+  _oneOffResume: null,
+  _resumePosition: null,
 
   current: () => {
-    const { queue, index } = get();
+    const { queue, index, oneOffItem } = get();
+    if (oneOffItem) return oneOffItem;
     return index >= 0 && index < queue.length ? queue[index] : null;
   },
 
@@ -291,6 +310,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       shuffle: false,
       naturalOrder: null,
       playingPlaylistId: playlistId,
+      oneOffItem: null,
+      _oneOffResume: null,
+      _resumePosition: null,
       _consecutiveErrors: 0,
       _autoSessionId: s._autoSessionId + 1,
       _autoTopUpInFlight: false,
@@ -310,6 +332,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       shuffle: true,
       naturalOrder: items.map((it) => it.key),
       playingPlaylistId: playlistId,
+      oneOffItem: null,
+      _oneOffResume: null,
+      _resumePosition: null,
       shuffleTick: s.shuffleTick + 1,
       _consecutiveErrors: 0,
       _autoSessionId: s._autoSessionId + 1,
@@ -327,7 +352,48 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     newQueue.splice(insertAt, 0, item);
     // A deliberate user pick gets a clean slate — it must not inherit the
     // failure count from a prior run of auto-skipped broken tracks.
-    set({ queue: newQueue, index: insertAt, _consecutiveErrors: 0 });
+    set({
+      queue: newQueue,
+      index: insertAt,
+      oneOffItem: null,
+      _oneOffResume: null,
+      _resumePosition: null,
+      _consecutiveErrors: 0,
+    });
+    await get()._load();
+  },
+
+  playOnce: async (item) => {
+    const st = get();
+    const retry = st._autoRetryTimer;
+    if (retry != null) clearTimeout(retry);
+    const queued =
+      st.index >= 0 && st.index < st.queue.length ? st.queue[st.index] : null;
+    // Choosing another temporary song while one is already playing must still
+    // return to the original queue position, not to the first temporary song.
+    const resume =
+      st._oneOffResume ??
+      ({
+        itemKey: queued?.key ?? null,
+        index: st.index,
+        position: st.position,
+        wasPlaying: st.isPlaying,
+      } satisfies OneOffResume);
+    audio.cancelCrossfade();
+    audio.clearPrime();
+    set({
+      oneOffItem: item,
+      _oneOffResume: resume,
+      _resumePosition: null,
+      crossfadeArmedFor: null,
+      _crossfadeTargetKey: null,
+      _prefetchedFor: null,
+      _consecutiveErrors: 0,
+      _autoSessionId: st._autoSessionId + 1,
+      _autoTopUpInFlight: false,
+      _autoCooldownUntil: 0,
+      _autoRetryTimer: null,
+    });
     await get()._load();
   },
 
@@ -369,6 +435,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   next: () => {
+    if (get().oneOffItem) {
+      void get()._finishPlayOnce();
+      return;
+    }
     const { queue, index, repeat, shuffle } = get();
     if (queue.length === 0) return;
     if (repeat === "one") {
@@ -413,6 +483,15 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   prev: () => {
+    if (get().oneOffItem) {
+      if (get().position > 3) {
+        audio.seek(0);
+        set({ position: 0 });
+      } else {
+        void get()._finishPlayOnce();
+      }
+      return;
+    }
     const { position, index } = get();
     // If a crossfade is overlapping, drop back to the outgoing track first.
     audio.cancelCrossfade();
@@ -605,13 +684,21 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   jumpTo: (i) => {
     if (i < 0 || i >= get().queue.length) return;
     // User-driven navigation gets a clean slate (see playNow).
-    set({ index: i, _consecutiveErrors: 0, _prefetchedFor: null });
+    set({
+      index: i,
+      oneOffItem: null,
+      _oneOffResume: null,
+      _resumePosition: null,
+      _consecutiveErrors: 0,
+      _prefetchedFor: null,
+    });
     audio.clearPrime();
     void get()._load();
   },
 
   reorderQueue: (items) => {
-    const cur = get().current();
+    const { queue, index } = get();
+    const cur = index >= 0 && index < queue.length ? queue[index] : null;
     const newIndex = cur
       ? items.findIndex((it) => it.key === cur.key)
       : get().index;
@@ -681,6 +768,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     set((s) => ({
       queue: [],
       index: -1,
+      oneOffItem: null,
       isPlaying: false,
       loadingStream: false,
       position: 0,
@@ -700,7 +788,52 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       _autoTopUpInFlight: false,
       _autoCooldownUntil: 0,
       _autoRetryTimer: null,
+      _oneOffResume: null,
+      _resumePosition: null,
     }));
+  },
+
+  _finishPlayOnce: async () => {
+    const st = get();
+    if (!st.oneOffItem) return;
+    const resume = st._oneOffResume;
+    if (!resume || st.queue.length === 0) {
+      audio.pause();
+      set((s) => ({
+        oneOffItem: null,
+        _oneOffResume: null,
+        _resumePosition: null,
+        isPlaying: false,
+        loadingStream: false,
+        position: 0,
+        duration: 0,
+        _loadedKey: null,
+        _playbackCommandId: s._playbackCommandId + 1,
+      }));
+      return;
+    }
+
+    const savedIndex = resume.itemKey
+      ? st.queue.findIndex((queued) => queued.key === resume.itemKey)
+      : -1;
+    const index =
+      savedIndex >= 0
+        ? savedIndex
+        : Math.max(0, Math.min(resume.index, st.queue.length - 1));
+    audio.pause();
+    set((s) => ({
+      oneOffItem: null,
+      _oneOffResume: null,
+      _resumePosition: resume.position,
+      index,
+      isPlaying: false,
+      loadingStream: false,
+      position: resume.position,
+      duration: st.queue[index]?.durationSec ?? 0,
+      _loadedKey: null,
+      _playbackCommandId: s._playbackCommandId + 1,
+    }));
+    if (resume.wasPlaying) await get()._load();
   },
 
   _load: async () => {
@@ -734,6 +867,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       set({ isPlaying: true, loadingStream: false });
       await audio.playPrimed(src);
       if (!isCurrentCommand()) return;
+      const resumePosition = get()._resumePosition;
+      if (resumePosition != null) {
+        audio.seek(resumePosition);
+      }
       // NOTE: do NOT reset _consecutiveErrors here. audio.play() resolves when
       // playback merely *starts*; a track that then fails surfaces its failure
       // asynchronously via the element's `error` event. Resetting on start would
@@ -746,7 +883,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         loadingStream: false,
         position: 0,
         _loadedKey: item.key,
+        _resumePosition: null,
       });
+      if (resumePosition != null) set({ position: resumePosition });
     } catch (e) {
       if (!isCurrentCommand()) return;
       set({
@@ -1031,6 +1170,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     // retry the next time its URL goes stale (e.g. on a repeat-all second lap).
     if (cur > 1 && (st._consecutiveErrors !== 0 || st._errorRetried !== null))
       set({ _consecutiveErrors: 0, _errorRetried: null });
+    // A temporary song is deliberately outside the queue: it must not trigger
+    // queue radio top-ups, prefetches, or crossfades while it is playing.
+    if (st.oneOffItem) return;
     // Look ahead: when auto-play is on and the unplayed runway runs low, stream
     // in more similar songs before the (optional) crossfade window arms.
     if (st.autoPlay && st.repeat === "off") {
@@ -1184,6 +1326,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const st = get();
     const item = st.current();
     if (!item) return;
+    if (st.oneOffItem) {
+      void st._finishPlayOnce();
+      return;
+    }
     // A cached stream URL may simply have expired (YouTube URLs last ~6h):
     // drop it and resolve a fresh one, once per queue item.
     if (
@@ -1223,7 +1369,11 @@ export function initPlayer() {
   initialized = true;
   audio.init();
   audio.onTime = (cur, dur) => usePlayerStore.getState()._onTime(cur, dur);
-  audio.onEnded = () => usePlayerStore.getState().next();
+  audio.onEnded = () => {
+    const player = usePlayerStore.getState();
+    if (player.oneOffItem) void player._finishPlayOnce();
+    else player.next();
+  };
   audio.onError = (e) => usePlayerStore.getState()._onPlaybackError(e);
   audio.setVolume(usePlayerStore.getState().volume);
 }

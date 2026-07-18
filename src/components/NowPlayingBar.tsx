@@ -21,6 +21,7 @@ import "./NowPlayingBar.css";
 export default function NowPlayingBar() {
   const queue = usePlayerStore((s) => s.queue);
   const index = usePlayerStore((s) => s.index);
+  const oneOffItem = usePlayerStore((s) => s.oneOffItem);
   const isPlaying = usePlayerStore((s) => s.isPlaying);
   const position = usePlayerStore((s) => s.position);
   const duration = usePlayerStore((s) => s.duration);
@@ -40,7 +41,9 @@ export default function NowPlayingBar() {
   const toggleShuffle = usePlayerStore((s) => s.toggleShuffle);
   const cycleRepeat = usePlayerStore((s) => s.cycleRepeat);
 
-  const current = index >= 0 && index < queue.length ? queue[index] : null;
+  const current =
+    oneOffItem ??
+    (index >= 0 && index < queue.length ? queue[index] : null);
   const dur = duration || current?.durationSec || 0;
   const pct = dur > 0 ? (position / dur) * 100 : 0;
 
@@ -53,7 +56,10 @@ export default function NowPlayingBar() {
           <Thumb src={current?.thumbnail} size={52} radius={8} />
         </div>
         <div className="np-meta">
-          <span className="np-title">{current?.title ?? "Nothing playing"}</span>
+          <span className="np-title">
+            {oneOffItem && <span className="np-once-tag">Once</span>}
+            {current?.title ?? "Nothing playing"}
+          </span>
           <span className="np-artist">
             {current?.artist || "Currently playing vibe"}
           </span>

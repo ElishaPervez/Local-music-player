@@ -243,3 +243,16 @@
     var(--bg-hover) var(--pct, 0%)
   );
 }
+.np-once-tag {
+  display: inline-flex;
+  margin-right: 7px;
+  padding: 1px 6px;
+  border-radius: 7px;
+  background: var(--accent-soft);
+  color: var(--accent-2);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}

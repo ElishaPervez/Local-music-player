@@ -1,33 +1,47 @@
-import type { CSSProperties } from "react";
+import { useCallback, useState, type CSSProperties } from "react";
 import { Music, Play, Search, History } from "lucide-react";
+import type { PlaybackItem } from "../lib/types";
 import { usePlayerStore } from "../stores/playerStore";
 import { useLibraryStore } from "../stores/libraryStore";
 import { useHistoryStore, type PlayedEntry } from "../stores/historyStore";
 import { useUIStore } from "../stores/uiStore";
 import { songToItem, resultToStreamItem } from "../lib/playback";
+import QueuePanel from "../components/QueuePanel";
+import PlaybackChoiceModal, {
+  type PlaybackChoice,
+} from "../components/PlaybackChoiceModal";
 import "./views.css";
 import "./HomeView.css";
 
 export default function HomeView() {
   const current = usePlayerStore((s) =>
+    s.oneOffItem ??
+    (s.index >= 0 && s.index < s.queue.length ? s.queue[s.index] : null),
+  );
+  const queuedCurrent = usePlayerStore((s) =>
     s.index >= 0 && s.index < s.queue.length ? s.queue[s.index] : null,
   );
+  const queueLength = usePlayerStore((s) => s.queue.length);
   const isPlaying = usePlayerStore((s) => s.isPlaying);
   const togglePlay = usePlayerStore((s) => s.togglePlay);
-  const playNow = usePlayerStore((s) => s.playNow);
+  const playQueue = usePlayerStore((s) => s.playQueue);
+  const addToQueue = usePlayerStore((s) => s.addToQueue);
+  const playOnce = usePlayerStore((s) => s.playOnce);
   const plays = useHistoryStore((s) => s.plays);
   const searches = useHistoryStore((s) => s.searches);
   const clearPlays = useHistoryStore((s) => s.clearPlays);
   const clearSearches = useHistoryStore((s) => s.clearSearches);
   const setView = useUIStore((s) => s.setView);
   const setPendingSearch = useUIStore((s) => s.setPendingSearch);
+  const [pendingItem, setPendingItem] = useState<PlaybackItem | null>(null);
+  const closePlaybackChoice = useCallback(() => setPendingItem(null), []);
 
   function playEntry(entry: PlayedEntry) {
     // Downloaded copy wins — plays offline from disk; otherwise stream it.
     const songs = useLibraryStore.getState().songs;
     const song =
       (entry.songId ? songs[entry.songId] : undefined) ?? songs[entry.videoId];
-    void playNow(
+    setPendingItem(
       song
         ? songToItem(song)
         : resultToStreamItem({
@@ -39,6 +53,15 @@ export default function HomeView() {
             url: `https://www.youtube.com/watch?v=${entry.videoId}`,
           }),
     );
+  }
+
+  function choosePlayback(choice: PlaybackChoice) {
+    if (!pendingItem) return;
+    const item = pendingItem;
+    setPendingItem(null);
+    if (choice === "replace") void playQueue([item]);
+    if (choice === "append") addToQueue(item);
+    if (choice === "once") void playOnce(item);
   }
 
   function searchAgain(query: string) {
@@ -181,6 +204,16 @@ export default function HomeView() {
           )}
         </div>
       </div>
+      <QueuePanel />
+      {pendingItem && (
+        <PlaybackChoiceModal
+          item={pendingItem}
+          queueLength={queueLength}
+          currentTitle={queuedCurrent?.title ?? null}
+          onChoose={choosePlayback}
+          onClose={closePlaybackChoice}
+        />
+      )}
     </div>
   );
 }

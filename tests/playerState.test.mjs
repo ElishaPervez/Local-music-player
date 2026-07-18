@@ -292,6 +292,55 @@ test("selecting a new song clears the previous song timeline while it loads", as
   await load;
 });
 
+test("playing once leaves the queue unchanged and resumes the same timestamp", async () => {
+  const a = stream("queue-a", "src:queue-a");
+  const b = stream("queue-b", "src:queue-b");
+  const temporary = stream("temporary", "src:temporary");
+  await usePlayerStore.getState().playQueue([a, b]);
+  usePlayerStore.getState()._onTime(47, 180);
+  const originalKeys = usePlayerStore.getState().queue.map((item) => item.key);
+
+  await usePlayerStore.getState().playOnce(temporary);
+
+  assert.deepEqual(
+    usePlayerStore.getState().queue.map((item) => item.key),
+    originalKeys,
+  );
+  assert.equal(usePlayerStore.getState().current()?.key, temporary.key);
+  assert.deepEqual(playingSources(), ["src:temporary"]);
+
+  await usePlayerStore.getState()._finishPlayOnce();
+
+  assert.deepEqual(
+    usePlayerStore.getState().queue.map((item) => item.key),
+    originalKeys,
+  );
+  assert.equal(usePlayerStore.getState().current()?.key, a.key);
+  assert.equal(usePlayerStore.getState().position, 47);
+  assert.deepEqual(playingSources(), ["src:queue-a"]);
+});
+
+test("playing once returns a paused queue to paused at the saved timestamp", async () => {
+  const queued = stream("paused-queue", "src:paused-queue");
+  const temporary = stream("paused-temporary", "src:paused-temporary");
+  await usePlayerStore.getState().playQueue([queued]);
+  usePlayerStore.getState()._onTime(32, 180);
+  usePlayerStore.getState().togglePlay();
+
+  await usePlayerStore.getState().playOnce(temporary);
+  await usePlayerStore.getState()._finishPlayOnce();
+
+  assert.equal(usePlayerStore.getState().current()?.key, queued.key);
+  assert.equal(usePlayerStore.getState().position, 32);
+  assert.equal(usePlayerStore.getState().isPlaying, false);
+  assert.deepEqual(playingSources(), []);
+
+  usePlayerStore.getState().togglePlay();
+  await flush();
+  assert.equal(usePlayerStore.getState().position, 32);
+  assert.deepEqual(playingSources(), ["src:paused-queue"]);
+});
+
 test("removing the incoming crossfade item silences it immediately", async () => {
   const a = stream("a", "src:a");
   const b = stream("b", "src:b");
