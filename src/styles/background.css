@@ -19,7 +19,7 @@
 .app-bg-scrim {
   position: fixed;
   inset: 0;
-  background: rgba(8, 9, 12, 0.42);
+  background: transparent;
   z-index: -1;
   pointer-events: none;
 }

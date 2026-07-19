@@ -29,8 +29,10 @@ dist-ssr
 # External tool binaries — too large for git; fetched by `npm run setup`
 # (scripts/setup-tools.ps1, also runs automatically before dev/build)
 src-tauri/binaries/
+src-tauri/resources/deno.exe
 src-tauri/resources/ffmpeg.exe
 src-tauri/resources/ffprobe.exe
+src-tauri/resources/bgutil/
 
 # Local-only duplicate of app-icon.png, named for the Discord "app_icon"
 # Rich Presence art-asset upload (see README → Discord Rich Presence).

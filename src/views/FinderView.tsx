@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Search, Loader2 } from "lucide-react";
 import type { SearchResult } from "../lib/types";
-import { api } from "../lib/api";
+import { api, errorMessage } from "../lib/api";
 import { useHistoryStore } from "../stores/historyStore";
 import { useUIStore } from "../stores/uiStore";
 import QueuePanel from "../components/QueuePanel";
@@ -26,7 +26,7 @@ export default function FinderView() {
       setResults(await api.search(q));
       useHistoryStore.getState().recordSearch(q);
     } catch (err) {
-      setError(String(err));
+      setError(errorMessage(err));
       setResults([]);
     } finally {
       setLoading(false);

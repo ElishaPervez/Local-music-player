@@ -421,6 +421,37 @@ test("renaming a library song updates its live queue and now-playing copy", () =
   assert.equal(usePlayerStore.getState().isPlaying, true);
 });
 
+test("a rejected stream shows the concrete playback error", async () => {
+  api.resolveStream = async () => {
+    throw "YouTube requires sign-in verification. Import cookies from the title bar.";
+  };
+
+  await usePlayerStore.getState().playQueue([stream("cookie-error")]);
+
+  assert.equal(usePlayerStore.getState().isPlaying, false);
+  assert.equal(usePlayerStore.getState().loadingStream, false);
+  assert.match(usePlayerStore.getState().playbackError, /requires sign-in/i);
+});
+
+test("a successful retry clears the previous playback error", async () => {
+  let attempts = 0;
+  api.resolveStream = async () => {
+    attempts += 1;
+    if (attempts === 1) throw "Saved cookies expired.";
+    return "src:cookie-retry";
+  };
+  const item = stream("cookie-retry");
+
+  await usePlayerStore.getState().playQueue([item]);
+  assert.match(usePlayerStore.getState().playbackError, /expired/i);
+
+  await usePlayerStore.getState()._load();
+  usePlayerStore.getState()._onTime(2, 180);
+
+  assert.equal(usePlayerStore.getState().playbackError, null);
+  assert.deepEqual(playingSources(), ["src:cookie-retry"]);
+});
+
 test("deleting the source playlist detaches the live queue without stopping it", () => {
   const playlist = {
     id: "playlist-delete",
@@ -443,4 +474,62 @@ test("deleting the source playlist detaches the live queue without stopping it",
   assert.equal(usePlayerStore.getState().playingPlaylistId, null);
   assert.equal(usePlayerStore.getState().queue.length, 1);
   assert.equal(usePlayerStore.getState().isPlaying, true);
+});
+
+test("cached stream URLs are re-resolved once their embedded expiry passes", async () => {
+  const { streamUrlIsFresh } = playerModule;
+  const now = 1_800_000_000_000; // fixed clock (ms)
+  const nowSec = now / 1000;
+
+  // Fresh: deadline comfortably ahead of the re-resolve margin.
+  assert.equal(
+    streamUrlIsFresh(
+      `https://rr3.googlevideo.com/videoplayback?expire=${nowSec + 3600}&id=x`,
+      now,
+    ),
+    true,
+  );
+  // Stale: deadline passed.
+  assert.equal(
+    streamUrlIsFresh(
+      `https://rr3.googlevideo.com/videoplayback?expire=${nowSec - 10}&id=x`,
+      now,
+    ),
+    false,
+  );
+  // Inside the safety margin counts as stale (would die mid-playback).
+  assert.equal(
+    streamUrlIsFresh(
+      `https://rr3.googlevideo.com/videoplayback?expire=${nowSec + 60}&id=x`,
+      now,
+    ),
+    false,
+  );
+  // Path-style stamp is also recognized.
+  assert.equal(
+    streamUrlIsFresh(
+      `https://rr3.googlevideo.com/videoplayback/expire/${Math.floor(nowSec - 10)}/id/x`,
+      now,
+    ),
+    false,
+  );
+  // No stamp / unparseable → assume usable, let error-retry handle it.
+  assert.equal(streamUrlIsFresh("https://example.com/audio.m4a", now), true);
+  assert.equal(streamUrlIsFresh("not a url", now), true);
+
+  // End-to-end: a queue item whose cached URL is expired gets a fresh resolve
+  // instead of being handed to the audio element.
+  let resolves = 0;
+  api.resolveStream = async () => {
+    resolves += 1;
+    return "src:refreshed";
+  };
+  const item = stream("expired-cache");
+  item.source.url = `https://rr3.googlevideo.com/videoplayback?expire=${Math.floor(
+    Date.now() / 1000 - 10,
+  )}&id=x`;
+  const src = await usePlayerStore.getState()._resolveSrcQuiet(item);
+  assert.equal(resolves, 1);
+  assert.equal(src, "src:refreshed");
+  assert.equal(item.source.url, "src:refreshed");
 });

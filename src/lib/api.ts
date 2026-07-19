@@ -29,6 +29,16 @@ export const api = {
   updateYtdlp: () => invoke<string>("update_ytdlp"),
   toolsStatus: () => invoke<ToolsStatus>("tools_status"),
   installFfmpeg: () => invoke<string>("install_ffmpeg"),
+  youtubeCookieStatus: () =>
+    invoke<YouTubeCookieStatus>("youtube_cookie_status"),
+  importYoutubeCookies: (sourcePath: string) =>
+    invoke<YouTubeCookieStatus>("import_youtube_cookies", { sourcePath }),
+  importYoutubeCookiesText: (cookieText: string) =>
+    invoke<YouTubeCookieStatus>("import_youtube_cookies_text", { cookieText }),
+  removeYoutubeCookies: () =>
+    invoke<YouTubeCookieStatus>("remove_youtube_cookies"),
+  verifyYoutubeCookies: () =>
+    invoke<YouTubeCookieStatus>("verify_youtube_cookies"),
   discordSetPresence: (presence: DiscordPresence) =>
     invoke<void>("discord_set_presence", { presence }),
   discordClear: () => invoke<void>("discord_clear"),
@@ -57,6 +67,31 @@ export interface MusicCredits {
 export interface ToolsStatus {
   ffmpegInstalled: boolean;
   ffmpegPath: string | null;
+}
+
+export type YouTubeCookieState =
+  | "notConfigured"
+  | "unverified"
+  | "verified"
+  | "rejected"
+  | "expired"
+  | "invalid";
+
+export interface YouTubeCookieStatus {
+  state: YouTubeCookieState;
+  updatedAt: number | null;
+  checkedAt: number | null;
+  usableCookieCount: number;
+  expiredCookieCount: number;
+}
+
+export function errorMessage(error: unknown): string {
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string") return message;
+  }
+  return "The operation failed.";
 }
 
 export interface SetupProgress {

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Minus, Square, Copy, X } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import appIcon from "../assets/icon.svg";
+import YouTubeCookiesButton from "./YouTubeCookiesButton";
 import "./TitleBar.css";
 
 const appWindow = getCurrentWindow();
@@ -36,6 +37,7 @@ export default function TitleBar() {
         <span className="title-bar-title">Local Music Player</span>
       </div>
       <div className="title-bar-controls">
+        <YouTubeCookiesButton />
         <button
           className="tb-btn"
           onClick={() => void appWindow.minimize()}

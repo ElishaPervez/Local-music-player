@@ -156,6 +156,20 @@
   cursor: not-allowed;
 }
 
+.np-playback-error {
+  width: min(100%, 580px);
+  padding: 5px 10px;
+  border: 1px solid rgba(239, 95, 107, 0.3);
+  border-radius: 7px;
+  background: rgba(239, 95, 107, 0.1);
+  color: #ff9aa4;
+  font-size: 11px;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .np-seek {
   display: flex;
   align-items: center;

@@ -1,4 +1,4 @@
-import { api, onDownloadProgress } from "./api";
+import { api, errorMessage, onDownloadProgress } from "./api";
 import type { SearchResult, Song } from "./types";
 import { useLibraryStore } from "../stores/libraryStore";
 import { useDownloadsStore } from "../stores/downloadsStore";
@@ -85,8 +85,7 @@ export async function ensureSongInLibrary(
     setTimeout(() => useDownloadsStore.getState().clear(result.videoId), 2500);
     return song;
   } catch (e) {
-    console.error("download failed", e);
-    dl.update(result.videoId, 0, "error");
+    dl.update(result.videoId, 0, "error", errorMessage(e));
     setTimeout(() => useDownloadsStore.getState().clear(result.videoId), 4000);
     return null;
   }

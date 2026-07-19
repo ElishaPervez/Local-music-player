@@ -56,3 +56,215 @@
   background: #e81123;
   color: #fff;
 }
+
+.cookie-control {
+  position: relative;
+  height: 100%;
+}
+.tb-cookie {
+  width: 38px;
+  position: relative;
+}
+.cookie-status-dot {
+  position: absolute;
+  right: 7px;
+  bottom: 6px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  box-shadow: 0 0 0 2px var(--bg-elev);
+}
+.tb-cookie.verified .cookie-status-dot {
+  background: #65d59a;
+}
+.tb-cookie.unverified .cookie-status-dot {
+  background: #d7a95b;
+}
+.tb-cookie.warning {
+  color: #ffb86b;
+}
+.tb-cookie.warning .cookie-status-dot {
+  background: #ff8a65;
+}
+
+.cookie-popover {
+  position: absolute;
+  z-index: 100;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 390px;
+  max-width: calc(100vw - 24px);
+  padding: 16px;
+  background: rgba(20, 22, 29, 0.98);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-pop);
+  user-select: text;
+  animation: cookie-popover-in 0.18s var(--ease-out) both;
+}
+@keyframes cookie-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-5px) scale(0.98);
+  }
+}
+.cookie-popover-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cookie-popover-head > div {
+  display: flex;
+  flex-direction: column;
+}
+.cookie-popover-head strong {
+  font-size: 13px;
+}
+.cookie-popover-head span {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.cookie-popover-icon {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: var(--text-dim);
+  background: var(--bg-elev-2);
+}
+.cookie-popover-icon.ok {
+  color: #65d59a;
+  background: rgba(101, 213, 154, 0.12);
+}
+.cookie-popover-icon.warning {
+  color: #ff9c78;
+  background: rgba(255, 108, 94, 0.12);
+}
+.cookie-popover-icon.unverified {
+  color: #d7a95b;
+  background: rgba(215, 169, 91, 0.12);
+}
+.cookie-retry {
+  margin-top: 10px;
+  padding: 6px 10px;
+  font-size: 11px;
+}
+.cookie-updated,
+.cookie-copy,
+.cookie-message,
+.cookie-security {
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+.cookie-updated {
+  margin-top: 10px;
+  color: var(--accent-2);
+}
+.cookie-copy {
+  margin-top: 10px;
+  color: var(--text-dim);
+}
+.cookie-paste-label {
+  display: block;
+  margin-top: 12px;
+  color: var(--text-dim);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.cookie-paste-wrap {
+  position: relative;
+  margin-top: 6px;
+}
+.cookie-paste {
+  width: 100%;
+  min-height: 104px;
+  max-height: 180px;
+  resize: vertical;
+  overflow: auto;
+  padding: 10px 38px 10px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+  background: var(--bg);
+  color: var(--text);
+  font: 11px/1.45 ui-monospace, "Cascadia Code", Consolas, monospace;
+  transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+}
+.cookie-paste:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.cookie-paste.masked {
+  -webkit-text-security: disc;
+}
+.cookie-paste::placeholder {
+  color: var(--text-faint);
+  -webkit-text-security: none;
+}
+.cookie-reveal {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  color: var(--text-faint);
+}
+.cookie-reveal:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+.cookie-paste-hint {
+  margin-top: 5px;
+  color: var(--text-faint);
+  font-size: 10.5px;
+}
+.cookie-submit {
+  width: 100%;
+  justify-content: center;
+  margin-top: 12px;
+}
+.cookie-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  color: var(--text-faint);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.cookie-divider::before,
+.cookie-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border-soft);
+}
+.cookie-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+.cookie-actions .btn-primary,
+.cookie-actions .btn-secondary {
+  padding: 7px 11px;
+  font-size: 12px;
+}
+.cookie-remove:hover:not(:disabled) {
+  color: #ff8a8a;
+}
+.cookie-message {
+  margin-top: 10px;
+  color: #ffb17a;
+  word-break: break-word;
+}
+.cookie-security {
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-faint);
+}

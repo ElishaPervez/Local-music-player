@@ -9,11 +9,13 @@ import {
   Blend,
   Wrench,
   Radio,
+  Cookie,
 } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { api, fileSrc, type ToolsStatus } from "../lib/api";
 import { useLibraryStore } from "../stores/libraryStore";
+import { useCookieStore } from "../stores/cookieStore";
 import type { AudioFormat } from "../lib/types";
 import {
   IMAGE_EXTS,
@@ -34,6 +36,11 @@ export default function SettingsView() {
   const setSettings = useLibraryStore((s) => s.setSettings);
   const songCount = useLibraryStore((s) => Object.keys(s.songs).length);
   const playlistCount = useLibraryStore((s) => s.playlists.length);
+  const cookieStatus = useCookieStore((s) => s.status);
+  const cookieBusy = useCookieStore((s) => s.busy);
+  const cookieVerifying = useCookieStore((s) => s.verifying);
+  const cookieMessage = useCookieStore((s) => s.message);
+  const openCookieControl = useCookieStore((s) => s.requestOpen);
 
   const [version, setVersion] = useState<string>("…");
   const [updating, setUpdating] = useState(false);
@@ -312,6 +319,45 @@ export default function SettingsView() {
                   Add…
                 </button>
               )}
+            </div>
+          </div>
+
+          <div className="setting-row">
+            <div className="setting-info">
+              <Cookie size={18} />
+              <div>
+                <strong>YouTube cookies</strong>
+                <p>
+                  {cookieVerifying
+                    ? "Verifying the saved session with YouTube…"
+                    : cookieStatus?.state === "verified"
+                      ? "Verified — YouTube accepted the saved session"
+                      : cookieStatus?.state === "rejected"
+                        ? "Rejected — sign in, export fresh cookies, and update them"
+                        : cookieStatus?.state === "unverified"
+                          ? "Stored but not verified — retry verification"
+                          : cookieStatus?.state === "expired"
+                            ? "Expired — export a fresh file or remove cookies to use anonymous access"
+                            : cookieStatus?.state === "invalid"
+                              ? "Invalid — update or remove the saved cookie file"
+                              : "Not configured — anonymous YouTube access is used"}
+                  {cookieMessage && (
+                    <>
+                      {" — "}
+                      <span className="update-msg">{cookieMessage}</span>
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className="setting-actions">
+              <button
+                className="btn-secondary"
+                onClick={openCookieControl}
+                disabled={cookieBusy || cookieVerifying}
+              >
+                Manage…
+              </button>
             </div>
           </div>
 

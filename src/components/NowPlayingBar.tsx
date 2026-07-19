@@ -30,6 +30,7 @@ export default function NowPlayingBar() {
   const shuffle = usePlayerStore((s) => s.shuffle);
   const autoPlay = usePlayerStore((s) => s.autoPlay);
   const loadingStream = usePlayerStore((s) => s.loadingStream);
+  const playbackError = usePlayerStore((s) => s.playbackError);
 
   const setAutoPlay = useLibraryStore((s) => s.setAutoPlay);
   const togglePlay = usePlayerStore((s) => s.togglePlay);
@@ -115,6 +116,12 @@ export default function NowPlayingBar() {
             <Radio size={16} />
           </button>
         </div>
+
+        {playbackError && (
+          <div className="np-playback-error" role="alert" title={playbackError}>
+            {playbackError}
+          </div>
+        )}
 
         <div className="np-seek">
           <span className="np-time">{formatDuration(position)}</span>

@@ -32,7 +32,7 @@ export default function ResultRow({
     }
     if (dl?.status === "error") {
       return (
-        <span className="result-error" title="Download failed">
+        <span className="result-error" title={dl.error || "Download failed"}>
           <AlertCircle size={18} />
         </span>
       );

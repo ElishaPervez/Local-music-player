@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Signed-in YouTube access — what was built</title>
+<style>
+  :root {
+    --bg: #0c0d11; --panel: #14161d; --panel2: #191c25; --border: #262a36;
+    --text: #e8eaf0; --dim: #9aa1b2; --accent: #7c9cff; --good: #57d38c;
+    --warn: #ffcf6b; --pink: #ff86c8; --bad: #ff7b7b;
+    font-family: -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: radial-gradient(1200px 700px at 70% -10%, #1a1f2e 0%, var(--bg) 55%); color: var(--text); line-height: 1.55; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 40px 24px 80px; }
+  h1 { font-size: 30px; margin: 0 0 6px; letter-spacing: -0.5px; }
+  .sub { color: var(--dim); font-size: 15px; margin-bottom: 30px; }
+  h2 { font-size: 19px; margin: 40px 0 14px; display: flex; align-items: center; gap: 10px; }
+  h2 .n { width: 26px; height: 26px; border-radius: 8px; background: var(--accent); color: #0a0c14; font-size: 14px; font-weight: 700; display: grid; place-items: center; flex-shrink: 0; }
+  p { margin: 8px 0; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; margin: 14px 0; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+  .tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: #20242f; color: var(--dim); border: 1px solid var(--border); }
+  .tag.new { background: rgba(87,211,140,.13); color: var(--good); border-color: rgba(87,211,140,.3); }
+  .tag.warn { background: rgba(255,207,107,.12); color: var(--warn); border-color: rgba(255,207,107,.3); }
+  code { background: #0f1219; border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; font-size: 13px; color: #cdd4e6; font-family: "SF Mono", Consolas, monospace; }
+  .flow { display: flex; align-items: stretch; gap: 0; flex-wrap: wrap; margin: 10px 0; }
+  .step { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; flex: 1; min-width: 140px; }
+  .step .t { font-weight: 650; font-size: 14px; margin-bottom: 3px; }
+  .step .d { color: var(--dim); font-size: 12.5px; }
+  .arrow { display: grid; place-items: center; color: var(--accent); font-size: 22px; padding: 0 8px; }
+  @media (max-width: 720px) { .arrow { transform: rotate(90deg); padding: 4px 0; } .flow { flex-direction: column; } }
+  .brace { border-left: 3px solid var(--accent); }
+  .brace.good { border-left-color: var(--good); }
+  .brace.warnb { border-left-color: var(--warn); }
+  .brace.bad { border-left-color: var(--bad); }
+  .k { color: var(--good); font-weight: 650; }
+  ul { margin: 8px 0; padding-left: 20px; }
+  li { margin: 5px 0; }
+  .files td { padding: 9px 12px; border-bottom: 1px solid var(--border); font-size: 13.5px; vertical-align: top; }
+  .files table { width: 100%; border-collapse: collapse; }
+  .files th { text-align: left; padding: 9px 12px; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--dim); border-bottom: 1px solid var(--border); }
+  .files code { font-size: 12.5px; }
+  .muted { color: var(--dim); font-size: 13px; }
+  .big { font-size: 15px; }
+  .pill { display:inline-block; width:11px; height:11px; border-radius:50%; vertical-align:middle; margin-right:6px; }
+  .pill.g { background: var(--good); } .pill.y { background: var(--warn); } .pill.r { background: var(--bad); } .pill.b { background: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Signed-in YouTube access — done</h1>
+  <div class="sub">Some songs simply never played before: YouTube would refuse the stream because the app was an anonymous visitor. You can now hand the app your own signed-in YouTube session, and those songs resolve and play like any other.</div>
+
+  <div class="card">
+    <p class="big" style="margin-top:0"><strong>The short version:</strong> a cookie button now lives in the title bar. You paste (or load a file of) your exported YouTube cookies, the app verifies them against YouTube once, and from then on every search and download runs as <em>you</em> instead of as a logged-out stranger. Age-restricted, region-limited, and "sign in to confirm you're not a bot" tracks start working. Two invisible helpers had to be built alongside it so those signed-in streams actually reach the speakers.</p>
+  </div>
+
+  <h2><span class="n">1</span> What you'll see</h2>
+  <div class="grid">
+    <div class="card">
+      <p><strong>A cookie button in the title bar.</strong> A small dot on it tells you the state at a glance:</p>
+      <p><span class="pill g"></span><strong>Verified</strong> — cookies work, YouTube accepted them.<br>
+      <span class="pill b"></span><strong>Not verified</strong> — imported but not yet checked.<br>
+      <span class="pill y"></span><strong>Expired / invalid</strong> — the file is stale or malformed.<br>
+      <span class="pill r"></span><strong>Rejected</strong> — YouTube refused them; time to re-export.</p>
+    </div>
+    <div class="card">
+      <p><strong>A popover to manage them.</strong> Paste the cookies into a masked field (or pick a file), press <code>Ctrl+Enter</code>, and it imports. It shows when they were last updated and last checked, offers a <em>Retry verification</em> button, and a <em>Remove</em> button to wipe them.</p>
+      <p class="muted">The pasted text is cleared after every attempt so it never lingers on screen.</p>
+    </div>
+  </div>
+  <div class="card">
+    <p style="margin:0"><strong>The observable payoff:</strong> before this, picking certain tracks ended in "Format error" or a track that resolved but instantly skipped. Now, with verified cookies in place, those same tracks play through.</p>
+  </div>
+
+  <h2><span class="n">2</span> Why one cookie file wasn't enough</h2>
+  <p>Handing yt-dlp your cookies gets it a stream URL — but that URL wouldn't play. Two separate walls sit between "YouTube gave us a link" and "sound comes out", and each needed its own helper. Here's the whole path:</p>
+
+  <div class="flow">
+    <div class="step brace good"><div class="t">Your cookies</div><div class="d">Imported, verified, and stored as a Netscape cookie file the app manages.</div></div>
+    <div class="arrow">→</div>
+    <div class="step brace"><div class="t">PO token helper</div><div class="d">A tiny local server mints a "proof-of-origin" token to attach to the request.</div></div>
+    <div class="arrow">→</div>
+    <div class="step brace"><div class="t">yt-dlp resolves</div><div class="d">Signed in <em>and</em> vouched-for, so YouTube returns a real, playable stream URL.</div></div>
+    <div class="arrow">→</div>
+    <div class="step brace warnb"><div class="t">Loopback proxy</div><div class="d">The player fetches audio from the app itself, not from YouTube directly.</div></div>
+    <div class="arrow">→</div>
+    <div class="step brace good"><div class="t">Sound plays</div><div class="d">Clean audio the webview can't reject.</div></div>
+  </div>
+
+  <div class="grid">
+    <div class="card brace bad">
+      <span class="tag warn">Wall #1</span>
+      <p><strong>Signed-in links were being refused (HTTP 403).</strong> When the app sent your cookies, YouTube expected a companion "proof-of-origin" token proving the request came from a real browser session. Without it, the resolve appeared to succeed but the stream URL was dead — the track would load and then silently never play.</p>
+      <p class="k">Fix: a bundled helper (a small Deno server) generates that token on demand. yt-dlp attaches it, and the link comes back alive. If the helper ever fails to start, the app just runs without it — exactly as it did before, no crash.</p>
+    </div>
+    <div class="card brace bad">
+      <span class="tag warn">Wall #2</span>
+      <p><strong>The player itself rejected the audio.</strong> YouTube's audio host can answer the player's first request with a redirect disguised as a web page. The webview treats that as suspicious and blocks the whole media load — the track reports "Format error" and gets skipped.</p>
+      <p class="k">Fix: a tiny web server runs inside the app on <code>127.0.0.1</code>. The player asks <em>it</em> for the audio; it fetches from YouTube behind the scenes, follows the redirects, and hands back a clean audio stream the player can't object to.</p>
+    </div>
+  </div>
+
+  <h2><span class="n">3</span> How your cookies are handled</h2>
+  <div class="card">
+    <ul>
+      <li><strong>They stay on your machine.</strong> Cookies are written to the app's own data folder as a standard Netscape cookie file and read only by the local yt-dlp process. Nothing is uploaded anywhere by this feature.</li>
+      <li><strong>The paste field is masked</strong> and wiped after each import attempt, so an active session token isn't left sitting on screen. A show/hide toggle lets you check what you pasted.</li>
+      <li><strong>The app tells you the risk plainly:</strong> these cookies <em>are</em> a live Google login. The popover warns never to paste them into a chat. Masking only stops casual on-screen exposure — the app still receives the text locally to install it.</li>
+      <li><strong>Verification is a real round-trip.</strong> "Verified" means YouTube actually accepted the cookies, not just that the file parsed. Expired or malformed cookies are caught and labelled instead of silently failing later.</li>
+      <li><strong>Concurrent-safe.</strong> Two downloads running at once can't stomp on each other's cookie file — writes are serialized, and any session refresh YouTube hands back is merged in rather than overwritten.</li>
+    </ul>
+  </div>
+
+  <h2><span class="n">4</span> What changed under the hood</h2>
+  <div class="files card" style="padding:6px 4px">
+    <table>
+      <tr><th>File</th><th>Role</th></tr>
+      <tr><td><code>src-tauri/src/youtube_cookies.rs</code> <span class="tag new">new</span></td><td>Imports, verifies, stores, and rotates the managed cookie file; parses both Cookie-Editor JSON and Netscape text.</td></tr>
+      <tr><td><code>src-tauri/src/bgutil.rs</code> <span class="tag new">new</span></td><td>Runs the bundled Deno proof-of-origin token server (Wall #1), best-effort, killed with the app.</td></tr>
+      <tr><td><code>src-tauri/src/stream_proxy.rs</code> <span class="tag new">new</span></td><td>The loopback audio proxy on <code>127.0.0.1</code> that gets streams past the webview's block (Wall #2).</td></tr>
+      <tr><td><code>src/components/YouTubeCookiesButton.tsx</code> <span class="tag new">new</span></td><td>The title-bar button, status dot, and import/verify/remove popover.</td></tr>
+      <tr><td><code>src/stores/cookieStore.ts</code> <span class="tag new">new</span></td><td>Front-end state: status, import, verify, and removal wired to the backend.</td></tr>
+      <tr><td><code>src-tauri/src/lib.rs</code>, <code>ytdlp.rs</code></td><td>Wire the cookie file, PO token, and proxy into every yt-dlp resolve and download.</td></tr>
+      <tr><td><code>scripts/setup-tools.ps1</code></td><td>Fetches the pinned Deno runtime and PO-token plugin so the helpers are bundled into the installer.</td></tr>
+      <tr><td><code>TitleBar.tsx</code>, <code>FinderView.tsx</code>, <code>ResultRow.tsx</code>, <code>SettingsView.tsx</code>, <code>api.ts</code>, <code>downloadService.ts</code></td><td>UI plumbing, the search/result surfacing of gated tracks, and settings hooks.</td></tr>
+    </table>
+  </div>
+
+  <p class="muted" style="margin-top:26px">Released as <strong>v0.8.0</strong>. Frontend build, 18 unit tests, and the Rust <code>cargo check</code> all pass; the Windows installer is built by CI when the tag is pushed.</p>
+</div>
+</body>
+</html>

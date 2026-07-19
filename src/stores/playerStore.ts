@@ -6,7 +6,7 @@ import type {
   Song,
 } from "../lib/types";
 import { audio } from "../lib/audio";
-import { api, fileSrc } from "../lib/api";
+import { api, errorMessage, fileSrc } from "../lib/api";
 import { resultToStreamItem, shuffleArray } from "../lib/playback";
 
 /** Length of the fade-out / fade-in overlap when crossfade is enabled. */
@@ -141,6 +141,35 @@ function filterCandidates(
  * settles; the resolved URL is then cached on item.source.url for later hits. */
 const inflightResolves = new Map<string, Promise<string>>();
 
+/** Re-resolve this many seconds BEFORE a stream URL's stamped deadline, so the
+ * URL stays valid across the whole span between handing it to the audio
+ * element and the element's last range request. */
+const STREAM_URL_EXPIRY_MARGIN_SEC = 300;
+
+/** Resolved googlevideo stream URLs embed their own expiry moment (unix
+ * seconds) — usually an `expire` query param, sometimes an `/expire/<ts>/`
+ * path segment. Past that moment the CDN refuses the request, so a cached URL
+ * that has outlived its stamp must be re-resolved, not played: handing it to
+ * the audio element just produces a silent no-start. URLs without a readable
+ * stamp are assumed fresh; a wrong guess still lands in the existing
+ * error-retry path, which drops the URL and resolves again. */
+export function streamUrlIsFresh(url: string, nowMs = Date.now()): boolean {
+  let stamp: string | undefined;
+  try {
+    const parsed = new URL(url);
+    stamp =
+      parsed.searchParams.get("expire") ??
+      parsed.pathname.match(/\/expire\/(\d+)(?:\/|$)/)?.[1] ??
+      undefined;
+  } catch {
+    return true;
+  }
+  if (!stamp) return true;
+  const expiresSec = Number(stamp);
+  if (!Number.isFinite(expiresSec)) return true;
+  return nowMs / 1000 < expiresSec - STREAM_URL_EXPIRY_MARGIN_SEC;
+}
+
 /** The index Next would advance to, or null if there is no next track. */
 function peekNextIndex(
   index: number,
@@ -174,6 +203,8 @@ interface PlayerState {
   repeat: RepeatMode;
   shuffle: boolean;
   loadingStream: boolean;
+  /** Visible reason the selected song could not start. */
+  playbackError: string | null;
   /** When true, the last seconds of each track fade into the next. */
   crossfade: boolean;
   /** When true, similar streamed songs are appended as the queue runs low. */
@@ -290,6 +321,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   repeat: "off",
   shuffle: false,
   loadingStream: false,
+  playbackError: null,
   crossfade: false,
   autoPlay: false,
   playingPlaylistId: null,
@@ -818,6 +850,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       oneOffItem: null,
       isPlaying: false,
       loadingStream: false,
+      playbackError: null,
       position: 0,
       duration: 0,
       naturalOrder: null,
@@ -898,6 +931,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       _loadedKey: null,
       isPlaying: false,
       loadingStream: true,
+      playbackError: null,
       position: 0,
       duration: 0,
     });
@@ -938,9 +972,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       set({
         isPlaying: false,
         loadingStream: false,
+        playbackError: errorMessage(e),
         _loadedKey: null,
       });
-      console.error("playback error", e);
     }
   },
 
@@ -1125,7 +1159,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   _resolveSrcQuiet: async (item) => {
     if (item.source.kind === "local") return fileSrc(item.source.path);
     const source = item.source; // narrowed to the stream variant
-    if (source.url) return source.url; // cache hit, no yt-dlp
+    if (source.url) {
+      if (streamUrlIsFresh(source.url)) return source.url; // cache hit, no yt-dlp
+      // The cached URL has outlived its embedded expiry (they last ~6h); the
+      // CDN would refuse it. Drop it and fall through to a fresh resolve.
+      source.url = "";
+    }
     // Coalesce with any concurrent resolve of the same item (foreground jump vs.
     // background prefetch) so only one yt-dlp -g runs; the late caller awaits it.
     const pending = inflightResolves.get(item.key);
@@ -1158,8 +1197,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       audio.prime(fileSrc(item.source.path)); // still pre-buffer the file
       return;
     }
-    // Already resolved? Just prime the buffer, mark done, no yt-dlp.
-    if (item.source.url) {
+    // Already resolved (and not past its embedded expiry)? Just prime the
+    // buffer, mark done, no yt-dlp. A stale URL falls through to the resolve
+    // path below, which drops it and fetches a fresh one.
+    if (item.source.url && streamUrlIsFresh(item.source.url)) {
       set({ _prefetchedFor: item.key });
       audio.prime(item.source.url);
       return;
@@ -1215,8 +1256,13 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     // past 0, so this never masks a genuine all-failing-queue stop.) Also clear
     // the one-shot stream-retry marker, so a track that recovers earns a fresh
     // retry the next time its URL goes stale (e.g. on a repeat-all second lap).
-    if (cur > 1 && (st._consecutiveErrors !== 0 || st._errorRetried !== null))
-      set({ _consecutiveErrors: 0, _errorRetried: null });
+    if (
+      cur > 1 &&
+      (st._consecutiveErrors !== 0 ||
+        st._errorRetried !== null ||
+        st.playbackError !== null)
+    )
+      set({ _consecutiveErrors: 0, _errorRetried: null, playbackError: null });
     // A temporary song is deliberately outside the queue: it must not trigger
     // queue radio top-ups, prefetches, or crossfades while it is playing.
     if (st.oneOffItem) return;
@@ -1401,6 +1447,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       set({
         isPlaying: false,
         loadingStream: false,
+        playbackError:
+          item.source.kind === "stream"
+            ? "YouTube delivered an audio stream that could not be played. Update the YouTube cookies from the title bar and retry."
+            : "This local audio file could not be played.",
         _loadedKey: null,
         _playbackCommandId: st._playbackCommandId + 1,
       });
