@@ -19,7 +19,7 @@
 //!   4. Rebuild the app. Until a real ID is set, all presence calls no-op.
 //! ──────────────────────────────────────────────────────────────────────────
 
-use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender, TryRecvError};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -37,13 +37,20 @@ const DISCORD_APP_ID: &str = "1516900867373011084";
 /// so a closed Discord doesn't get hammered on every presence update.
 const RECONNECT_THROTTLE: Duration = Duration::from_secs(15);
 
+/// How often the worker wakes up to retry a snapshot that couldn't be
+/// delivered (Discord wasn't running when it arrived). Without this retry,
+/// starting Discord mid-song would show nothing until the next track change.
+/// Actual reconnect I/O is still bounded by RECONNECT_THROTTLE; this tick is
+/// cheap when there's nothing to retry.
+const RETRY_INTERVAL: Duration = Duration::from_secs(5);
+
 /// True once a real, numeric application id has been pasted in above.
 fn is_configured() -> bool {
     DISCORD_APP_ID.len() >= 17 && DISCORD_APP_ID.bytes().all(|b| b.is_ascii_digit())
 }
 
 /// Playback snapshot pushed from the frontend on each meaningful change.
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Presence {
     title: String,
@@ -141,12 +148,22 @@ enum Msg {
 /// playlist firing one push per track can't build an unbounded backlog.
 fn worker(rx: Receiver<Msg>) {
     let mut conn = DiscordConn::default();
-    while let Ok(mut msg) = rx.recv() {
+    // The latest snapshot that has NOT reached Discord (it wasn't running, or
+    // the pipe broke mid-write), plus when it was captured. Retried on a timer
+    // so launching Discord mid-song picks the song up within seconds instead
+    // of waiting for the next track/pause change in the app.
+    let mut undelivered: Option<(Presence, Instant)> = None;
+    loop {
+        let mut msg = match rx.recv_timeout(RETRY_INTERVAL) {
+            Ok(m) => Some(m),
+            Err(RecvTimeoutError::Timeout) => None,
+            Err(RecvTimeoutError::Disconnected) => break,
+        };
         // Drain everything already queued and keep only the most recent request
         // — each presence push is a full snapshot, so older ones are obsolete.
         loop {
             match rx.try_recv() {
-                Ok(m) => msg = m,
+                Ok(m) => msg = Some(m),
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) => break,
             }
@@ -156,11 +173,38 @@ fn worker(rx: Receiver<Msg>) {
         // for the rest of the session — we drop the (possibly half-broken)
         // client so the next request reconnects cleanly.
         let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| match msg {
-            Msg::Set(p) => {
-                let _ = conn.apply(&p);
+            Some(Msg::Set(p)) => {
+                let received = Instant::now();
+                match conn.apply(&p) {
+                    Ok(()) => undelivered = None,
+                    Err(_) => undelivered = Some((p, received)),
+                }
             }
-            Msg::Clear => conn.clear(),
-            Msg::Disconnect => conn.disconnect(),
+            Some(Msg::Clear) => {
+                undelivered = None;
+                conn.clear();
+            }
+            Some(Msg::Disconnect) => {
+                undelivered = None;
+                conn.disconnect();
+            }
+            // Retry tick. The snapshot's position is stale by however long it
+            // sat here, so advance it for a playing track — otherwise the
+            // progress bar would start where the song was when Discord was
+            // still closed.
+            None => {
+                if let Some((p, since)) = undelivered.take() {
+                    let mut adjusted = p.clone();
+                    if adjusted.is_playing && adjusted.duration_sec > 0.0 {
+                        adjusted.position_sec = (adjusted.position_sec
+                            + since.elapsed().as_secs_f64())
+                        .min(adjusted.duration_sec);
+                    }
+                    if conn.apply(&adjusted).is_err() {
+                        undelivered = Some((p, since));
+                    }
+                }
+            }
         }));
         if outcome.is_err() {
             conn.client = None;
@@ -197,13 +241,55 @@ fn clamp_field(s: &str) -> String {
     t
 }
 
+/// "m:ss" (or "h:mm:ss") for the paused-at readout.
+fn fmt_clock(sec: f64) -> String {
+    let total = sec.max(0.0) as u64;
+    let (h, m, s) = (total / 3600, (total % 3600) / 60, total % 60);
+    if h > 0 {
+        format!("{h}:{m:02}:{s:02}")
+    } else {
+        format!("{m}:{s:02}")
+    }
+}
+
+/// Emoji rainbow progress bar. Discord gives no control over the look of its
+/// native timestamp bar, so the colour happens in the state text instead:
+/// filled cells cycle 🟥🟧🟨🟩🟦🟪, empty cells are ⬛. While playing the
+/// frontend re-pushes every ~15s to keep it moving; while paused it's frozen —
+/// which is exactly right.
+fn rainbow_bar(p: &Presence) -> Option<String> {
+    const CELLS: usize = 10;
+    const RAINBOW: [&str; 6] = ["🟥", "🟧", "🟨", "🟩", "🟦", "🟪"];
+    if !p.duration_sec.is_finite() || p.duration_sec <= 0.0 {
+        return None;
+    }
+    let frac = (p.position_sec / p.duration_sec).clamp(0.0, 1.0);
+    let filled = (frac * CELLS as f64).round() as usize;
+    let mut bar = String::new();
+    for i in 0..CELLS {
+        bar.push_str(if i < filled { RAINBOW[i % RAINBOW.len()] } else { "⬛" });
+    }
+    Some(bar)
+}
+
 /// The second line: artist plus a compact loop/shuffle tag when relevant, so a
 /// looping playlist is visible even without the optional small-icon badges.
+/// Paused playback shows the frozen position (Discord's native bar only exists
+/// while timestamps are set, i.e. while playing), and both states end with the
+/// rainbow bar.
 fn build_state(p: &Presence) -> String {
     let mut parts: Vec<String> = Vec::new();
     let artist = p.artist.trim();
     if !artist.is_empty() {
         parts.push(format!("by {artist}"));
+    }
+    if !p.is_playing {
+        if p.duration_sec.is_finite() && p.duration_sec > 0.0 {
+            let pos = p.position_sec.clamp(0.0, p.duration_sec);
+            parts.push(format!("⏸ {} / {}", fmt_clock(pos), fmt_clock(p.duration_sec)));
+        } else {
+            parts.push("⏸ Paused".into());
+        }
     }
     match p.repeat.as_str() {
         "one" => parts.push("🔂 Repeat one".into()),
@@ -212,6 +298,9 @@ fn build_state(p: &Presence) -> String {
     }
     if p.shuffle {
         parts.push("🔀 Shuffle".into());
+    }
+    if let Some(bar) = rainbow_bar(p) {
+        parts.push(bar);
     }
     if parts.is_empty() {
         String::new()

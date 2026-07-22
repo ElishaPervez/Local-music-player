@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="bgA" cx="30%" cy="22%" r="90%">
+      <stop offset="0%" stop-color="#1c1c1e"/>
+      <stop offset="55%" stop-color="#0a0a0b"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="115" fill="url(#bgA)"/>
+  <rect x="3" y="3" width="506" height="506" rx="112" fill="none" stroke="rgba(255,255,255,0.09)" stroke-width="3"/>
+  <g fill="#ffffff">
+    <polygon points="220,138 404,106 404,158 220,190"/>
+    <rect x="220" y="150" width="24" height="212"/>
+    <rect x="380" y="118" width="24" height="218"/>
+    <ellipse cx="200" cy="362" rx="50" ry="37" transform="rotate(-18 200 362)"/>
+    <ellipse cx="360" cy="336" rx="50" ry="37" transform="rotate(-18 360 336)"/>
+  </g>
+</svg>

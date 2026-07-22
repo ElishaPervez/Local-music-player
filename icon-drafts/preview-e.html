@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Option E — Vinyl + Headphones</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #101014;
+    color: #e8e8ec;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    padding: 48px 32px 80px;
+    min-height: 100vh;
+  }
+  h1 { font-size: 26px; font-weight: 600; text-align: center; }
+  .sub { text-align: center; color: #8a8a94; margin-top: 8px; font-size: 14px; }
+  .wrap { max-width: 1100px; margin: 40px auto 0; display: flex; flex-direction: column; gap: 28px; align-items: center; }
+  .card {
+    background: #17171c;
+    border: 1px solid #26262e;
+    border-radius: 18px;
+    padding: 32px 28px 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    width: 100%;
+    max-width: 640px;
+  }
+  .card h2 { font-size: 18px; font-weight: 600; }
+  .hero svg { width: 280px; height: 280px; display: block; filter: drop-shadow(0 12px 32px rgba(0,0,0,0.55)); }
+  .sizes { display: flex; align-items: flex-end; gap: 26px; }
+  .sizes .s { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .sizes .s span { font-size: 11px; color: #6d6d78; }
+  .taskbar {
+    width: 100%;
+    background: #1e1e23;
+    border: 1px solid #2c2c34;
+    border-radius: 10px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+  }
+  .taskbar .ghost { width: 26px; height: 26px; border-radius: 6px; background: #33333c; }
+  .taskbar svg { width: 28px; height: 28px; }
+  .taskbar .active { position: relative; }
+  .taskbar .active::after {
+    content: ""; position: absolute; left: 50%; transform: translateX(-50%);
+    bottom: -8px; width: 14px; height: 3px; border-radius: 2px; background: #7a7a86;
+  }
+  .compare {
+    display: flex; gap: 40px; align-items: center;
+  }
+  .compare .c { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .compare .c span { font-size: 12px; color: #8a8a94; }
+  .compare svg { width: 120px; height: 120px; }
+  .note {
+    max-width: 640px; margin: 10px auto 0; text-align: center;
+    color: #8a8a94; font-size: 14px; line-height: 1.6;
+  }
+  .note b { color: #cfcfd6; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<h1>Option E — Vinyl wearing headphones</h1>
+<p class="sub">Smaller record, headphone band arcing over it, ear cups hugging the sides.</p>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>E — Vinyl + Headphones</h2>
+    <div class="hero">
+      <svg viewBox="0 0 512 512">
+        <defs><radialGradient id="e1" cx="30%" cy="22%" r="90%"><stop offset="0%" stop-color="#1c1c1e"/><stop offset="55%" stop-color="#0a0a0b"/><stop offset="100%" stop-color="#000"/></radialGradient></defs>
+        <rect width="512" height="512" rx="115" fill="url(#e1)"/>
+        <rect x="3" y="3" width="506" height="506" rx="112" fill="none" stroke="rgba(255,255,255,0.09)" stroke-width="3"/>
+        <circle cx="256" cy="312" r="108" fill="none" stroke="#fff" stroke-width="22"/>
+        <circle cx="256" cy="312" r="76" fill="none" stroke="#fff" stroke-width="6" opacity="0.55"/>
+        <circle cx="256" cy="312" r="58" fill="none" stroke="#fff" stroke-width="6" opacity="0.35"/>
+        <circle cx="256" cy="312" r="36" fill="#fff"/>
+        <circle cx="256" cy="312" r="10" fill="#000"/>
+        <path d="M96 322 L96 282 A160 160 0 0 1 416 282 L416 322" fill="none" stroke="#fff" stroke-width="32" stroke-linecap="round"/>
+        <rect x="68" y="270" width="56" height="114" rx="28" fill="#fff"/>
+        <rect x="388" y="270" width="56" height="114" rx="28" fill="#fff"/>
+      </svg>
+    </div>
+    <div class="sizes">
+      <div class="s"><svg width="64" height="64" viewBox="0 0 512 512"><use href="#gE"/></svg><span>64</span></div>
+      <div class="s"><svg width="48" height="48" viewBox="0 0 512 512"><use href="#gE"/></svg><span>48</span></div>
+      <div class="s"><svg width="32" height="32" viewBox="0 0 512 512"><use href="#gE"/></svg><span>32</span></div>
+      <div class="s"><svg width="24" height="24" viewBox="0 0 512 512"><use href="#gE"/></svg><span>24</span></div>
+    </div>
+    <div class="taskbar">
+      <div class="ghost"></div><div class="ghost"></div>
+      <div class="active"><svg viewBox="0 0 512 512"><use href="#gE"/></svg></div>
+      <div class="ghost"></div><div class="ghost"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Side by side with the original vinyl</h2>
+    <div class="compare">
+      <div class="c">
+        <svg viewBox="0 0 512 512"><use href="#gC"/></svg>
+        <span>C — plain vinyl</span>
+      </div>
+      <div class="c">
+        <svg viewBox="0 0 512 512"><use href="#gE"/></svg>
+        <span>E — vinyl + headphones</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="note">
+  If you like it but want it adjusted — record even smaller, thicker headphone band,
+  cups closer in, or grooves removed so it's cleaner at tiny sizes — just say the word.
+  Once you're happy I'll generate the .ico + full PNG set and wire it into the app.
+</p>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <g id="gE">
+      <rect width="512" height="512" rx="115" fill="#050506"/>
+      <circle cx="256" cy="312" r="108" fill="none" stroke="#fff" stroke-width="22"/>
+      <circle cx="256" cy="312" r="76" fill="none" stroke="#fff" stroke-width="6" opacity="0.55"/>
+      <circle cx="256" cy="312" r="58" fill="none" stroke="#fff" stroke-width="6" opacity="0.35"/>
+      <circle cx="256" cy="312" r="36" fill="#fff"/>
+      <circle cx="256" cy="312" r="10" fill="#000"/>
+      <path d="M96 322 L96 282 A160 160 0 0 1 416 282 L416 322" fill="none" stroke="#fff" stroke-width="32" stroke-linecap="round"/>
+      <rect x="68" y="270" width="56" height="114" rx="28" fill="#fff"/>
+      <rect x="388" y="270" width="56" height="114" rx="28" fill="#fff"/>
+    </g>
+    <g id="gC">
+      <rect width="512" height="512" rx="115" fill="#050506"/>
+      <circle cx="256" cy="256" r="172" fill="none" stroke="#fff" stroke-width="28"/>
+      <circle cx="256" cy="256" r="124" fill="none" stroke="#fff" stroke-width="7" opacity="0.55"/>
+      <circle cx="256" cy="256" r="98" fill="none" stroke="#fff" stroke-width="7" opacity="0.35"/>
+      <circle cx="256" cy="256" r="56" fill="#fff"/>
+      <circle cx="256" cy="256" r="15" fill="#000"/>
+    </g>
+  </defs>
+</svg>
+
+</body>
+</html>

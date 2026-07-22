@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>New icon + Discord fixes</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #101014; color: #e8e8ec; font-family: "Segoe UI", system-ui, sans-serif; line-height: 1.6; padding: 48px 24px 90px; }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 26px; font-weight: 650; }
+  h2 { font-size: 19px; font-weight: 650; margin: 44px 0 14px; padding-top: 24px; border-top: 1px solid #26262e; }
+  p { color: #b9b9c2; margin: 10px 0; }
+  strong { color: #e8e8ec; }
+  .lede { font-size: 15px; color: #9a9aa4; margin-top: 8px; }
+
+  .pill { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .4px; padding: 3px 10px; border-radius: 999px; margin-right: 8px; vertical-align: 2px; }
+  .pill.fixed { background: #143d24; color: #6fe09a; }
+  .pill.new { background: #1b2a4a; color: #7fb0ff; }
+  .pill.limit { background: #40331a; color: #ffc866; }
+
+  .card { background: #17171c; border: 1px solid #26262e; border-radius: 14px; padding: 20px 22px; margin: 16px 0; }
+  .bug h3 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+  .bug .obs { color: #d8d8e0; }
+  .bug .why { color: #8a8a94; font-size: 14px; margin-top: 6px; }
+
+  /* Discord mock cards */
+  .discords { display: flex; gap: 20px; flex-wrap: wrap; margin: 18px 0; }
+  .dcard { background: #111214; border: 1px solid #2a2b30; border-radius: 10px; padding: 14px 16px; width: 400px; }
+  .dcard .dtitle { font-size: 11px; font-weight: 700; color: #b5bac1; text-transform: uppercase; letter-spacing: .3px; margin-bottom: 10px; }
+  .drow { display: flex; gap: 12px; }
+  .dart { position: relative; width: 58px; height: 58px; flex: none; }
+  .dart svg.big { width: 58px; height: 58px; border-radius: 10px; display: block; }
+  .dart .badge { position: absolute; right: -4px; bottom: -4px; width: 20px; height: 20px; border-radius: 50%; background: #111214; display: flex; align-items: center; justify-content: center; font-size: 10px; }
+  .dmeta { min-width: 0; }
+  .dmeta .song { font-size: 14px; font-weight: 650; color: #f2f3f5; }
+  .dmeta .line { font-size: 12.5px; color: #b5bac1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dmeta .emojibar { letter-spacing: 1px; font-size: 11px; }
+  .dbar { margin-top: 8px; }
+  .dbar .track { height: 4px; border-radius: 2px; background: #35363c; position: relative; }
+  .dbar .fill { position: absolute; inset: 0 auto 0 0; width: 38%; border-radius: 2px; background: #f2f3f5; }
+  .dbar .times { display: flex; justify-content: space-between; font-size: 11px; color: #b5bac1; margin-top: 4px; }
+  .caption { font-size: 12.5px; color: #6d6d78; margin-top: 8px; }
+
+  /* retry flow */
+  .flow { display: flex; align-items: stretch; gap: 0; flex-wrap: wrap; margin: 14px 0; }
+  .fstep { background: #1b1b21; border: 1px solid #2c2c34; border-radius: 10px; padding: 12px 14px; font-size: 13px; color: #c9c9d2; width: 200px; }
+  .fstep b { display: block; color: #e8e8ec; font-size: 12px; margin-bottom: 4px; }
+  .farrow { align-self: center; padding: 0 10px; color: #55555f; font-size: 18px; }
+
+  .iconrow { display: flex; align-items: flex-end; gap: 26px; margin: 14px 0; }
+  .iconrow img { image-rendering: auto; border-radius: 18%; }
+  .iconrow .s { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11px; color: #6d6d78; }
+
+  .note { background: #1c1a12; border: 1px solid #3d3520; border-radius: 12px; padding: 14px 18px; color: #d8cba4; font-size: 14px; margin: 14px 0; }
+  ul.plain { margin: 8px 0 0 20px; color: #b9b9c2; }
+  ul.plain li { margin: 4px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>New app icon is in &amp; Discord now mirrors the player</h1>
+<p class="lede">The waveform icon (option B) replaced the old purple note across every size Windows uses.
+Three Discord sync bugs are fixed, paused songs now show where they stopped, and there's a rainbow progress bar.</p>
+
+<h2><span class="pill new">DONE</span>App icon</h2>
+<p>The full Windows icon set was regenerated from the waveform design — the taskbar icon, the window icon,
+the installer icon, and the Start-menu tiles all come from these files. <strong>You'll see the new icon after the
+next build/release</strong>; the currently installed version keeps the old one until then.</p>
+<div class="iconrow">
+  <div class="s"><img src="../src-tauri/icons/128x128.png" width="128" height="128" alt=""><span>128 px</span></div>
+  <div class="s"><img src="../src-tauri/icons/64x64.png" width="64" height="64" alt=""><span>64 px</span></div>
+  <div class="s"><img src="../src-tauri/icons/32x32.png" width="32" height="32" alt=""><span>32 px</span></div>
+</div>
+
+<h2><span class="pill new">NEW</span>What your Discord profile shows now</h2>
+<div class="discords">
+
+  <div class="dcard">
+    <div class="dtitle">Listening to Local Music Player — playing</div>
+    <div class="drow">
+      <div class="dart">
+        <svg class="big" viewBox="0 0 512 512"><rect width="512" height="512" fill="#050506"/><g fill="#fff"><rect x="116" y="196" width="40" height="120" rx="20"/><rect x="176" y="146" width="40" height="220" rx="20"/><rect x="236" y="106" width="40" height="300" rx="20"/><rect x="296" y="166" width="40" height="180" rx="20"/><rect x="356" y="206" width="40" height="100" rx="20"/></g></svg>
+        <div class="badge">▶</div>
+      </div>
+      <div class="dmeta">
+        <div class="song">Duvet</div>
+        <div class="line">by bôa · <span class="emojibar">🟥🟧🟨🟩⬛⬛⬛⬛⬛⬛</span></div>
+        <div class="dbar">
+          <div class="track"><div class="fill"></div></div>
+          <div class="times"><span>1:17</span><span>3:26</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="caption">Discord's own bar slides smoothly on its own. The rainbow bar above it fills left-to-right
+    through red→purple and hops forward roughly every 15 seconds.</p>
+  </div>
+
+  <div class="dcard">
+    <div class="dtitle">Listening to Local Music Player — paused</div>
+    <div class="drow">
+      <div class="dart">
+        <svg class="big" viewBox="0 0 512 512"><rect width="512" height="512" fill="#050506"/><g fill="#fff"><rect x="116" y="196" width="40" height="120" rx="20"/><rect x="176" y="146" width="40" height="220" rx="20"/><rect x="236" y="106" width="40" height="300" rx="20"/><rect x="296" y="166" width="40" height="180" rx="20"/><rect x="356" y="206" width="40" height="100" rx="20"/></g></svg>
+        <div class="badge">⏸</div>
+      </div>
+      <div class="dmeta">
+        <div class="song">Duvet</div>
+        <div class="line">by bôa · ⏸ 1:17 / 3:26</div>
+        <div class="line emojibar">🟥🟧🟨🟩⬛⬛⬛⬛⬛⬛</div>
+      </div>
+    </div>
+    <p class="caption">Before this change, pausing showed nothing about progress at all — just the song name.
+    Now it shows exactly where you stopped, frozen. If you seek while paused, the numbers follow within ~2 s.</p>
+  </div>
+
+</div>
+<p>The loop / repeat-one / shuffle tags (🔁 🔂 🔀) and the playlist name on the artwork hover stay as they were.</p>
+
+<div class="note"><strong>The honest limitation:</strong> Discord does not let any app restyle its built-in
+progress bar — Spotify's white bar is the only look it offers. So the rainbow lives as a row of colored
+squares in the text line. It can only move when the app sends Discord a fresh update, and Discord caps how
+often that's allowed, so it advances in ~15-second hops rather than gliding. The smooth built-in bar is still
+there underneath doing the precise timekeeping.</div>
+
+<h2><span class="pill fixed">FIXED</span>Sync bugs found in the hunt</h2>
+
+<div class="card bug">
+  <h3>1 — Start music first, open Discord second → profile stayed blank for the whole song</h3>
+  <p class="obs">If Discord wasn't running (or was restarting) at the moment a song started, the update sent to it
+  was simply thrown away. Nothing would appear on your profile until the <em>next</em> event — the next track,
+  or you pressing pause. Play a long mix and open Discord mid-way: blank profile for potentially an hour.</p>
+  <p class="why">Now the app holds on to the last update it couldn't deliver and re-tries every 5 seconds.
+  When Discord comes up, your song appears within seconds — and the progress bar starts at where the song
+  <em>actually is now</em>, not where it was when Discord was still closed.</p>
+</div>
+
+<div class="flow">
+  <div class="fstep"><b>Song starts</b>Update sent to Discord</div>
+  <div class="farrow">→</div>
+  <div class="fstep"><b>Discord closed</b>Delivery fails — update is kept, not dropped</div>
+  <div class="farrow">→</div>
+  <div class="fstep"><b>Every 5 s</b>Try again, with the elapsed time added to the position</div>
+  <div class="farrow">→</div>
+  <div class="fstep"><b>Discord opens</b>Song + correct progress appear within seconds</div>
+</div>
+
+<div class="card bug">
+  <h3>2 — Seeking while paused never reached Discord</h3>
+  <p class="obs">Position changes made while paused were deliberately ignored (they never mattered before,
+  because a paused song displayed no position). With the new "⏸ 1:17 / 3:26" readout they matter — without
+  this fix, you could drag the paused song to the start and Discord would keep claiming you're 1:17 in.</p>
+  <p class="why">A position change while paused now counts as a real change and gets pushed.</p>
+</div>
+
+<div class="card bug">
+  <h3>3 — "Play once" songs were credited to a playlist they're not in</h3>
+  <p class="obs">Playing a one-off song outside the queue kept showing the interrupted playlist's name on the
+  artwork hover — so your profile claimed the random song was part of, say, "late night drives".</p>
+  <p class="why">One-off songs now show the app name there instead; the playlist name returns when the queue resumes.</p>
+</div>
+
+<h2>Also checked, found solid</h2>
+<ul class="plain">
+  <li>Track changes, pause/resume, seeks while playing, repeat-one restarts, and crossfade handoffs all
+      re-align the bar correctly (verified in the update-triggering logic).</li>
+  <li>Closing the app clears your profile immediately — Discord drops the status when the connection dies.</li>
+  <li>Update frequency stays inside Discord's allowance even with the new 15-second rainbow refresh.</li>
+</ul>
+
+<h2><span class="pill limit">HEADS-UP</span>Verification status</h2>
+<ul class="plain">
+  <li>Frontend: type-check clean, all 18 player tests pass.</li>
+  <li>The Rust side <strong>could not be compiled on this machine — no Rust toolchain is installed here</strong>
+      (it appears to have been removed since the last local build). An independent line-by-line review found no
+      compile or logic problems, but the real proof is the next build. Your tag-push CI builds on GitHub's
+      machines, so a release build will work regardless; building locally again needs Rust reinstalled.</li>
+  <li>Live look on a real Discord profile is worth a quick eyeball after the next build — especially the
+      rainbow squares, since Discord renders emoji slightly differently per platform.</li>
+</ul>
+
+</div>
+</body>
+</html>
