@@ -25,7 +25,7 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use discord_rich_presence::{
-    activity::{Activity, ActivityType, Assets, Timestamps},
+    activity::{Activity, ActivityType, Assets, Button, Timestamps},
     DiscordIpc, DiscordIpcClient,
 };
 use serde::Deserialize;
@@ -40,6 +40,11 @@ const DISCORD_APP_ID: &str = "1516900867373011084";
 /// updates the icon everywhere.
 const LARGE_IMAGE_URL: &str =
     "https://raw.githubusercontent.com/ElishaPervez/Local-music-player/main/icon-drafts/icon-b-waveform-1024.png";
+
+/// Link button shown under the activity for OTHER people viewing the profile.
+/// (Discord hides an activity's buttons from the account that owns it, so
+/// don't expect to see this on your own profile — check from another account.)
+const DOWNLOAD_URL: &str = "https://github.com/ElishaPervez/Local-music-player/releases/latest";
 
 /// Reconnect attempts to Discord are throttled to at most one per this window,
 /// so a closed Discord doesn't get hammered on every presence update.
@@ -350,7 +355,9 @@ fn build_activity(p: &Presence) -> Activity<'static> {
         .small_image(small_image)
         .small_text(clamp_field(&small_text));
 
-    activity.assets(assets)
+    activity
+        .assets(assets)
+        .buttons(vec![Button::new("Get Local Music Player", DOWNLOAD_URL)])
 }
 
 /// Push the current playback state to Discord (no-op until configured).
