@@ -252,31 +252,12 @@ fn fmt_clock(sec: f64) -> String {
     }
 }
 
-/// Emoji rainbow progress bar. Discord gives no control over the look of its
-/// native timestamp bar, so the colour happens in the state text instead:
-/// filled cells cycle 🟥🟧🟨🟩🟦🟪, empty cells are ⬛. While playing the
-/// frontend re-pushes every ~15s to keep it moving; while paused it's frozen —
-/// which is exactly right.
-fn rainbow_bar(p: &Presence) -> Option<String> {
-    const CELLS: usize = 10;
-    const RAINBOW: [&str; 6] = ["🟥", "🟧", "🟨", "🟩", "🟦", "🟪"];
-    if !p.duration_sec.is_finite() || p.duration_sec <= 0.0 {
-        return None;
-    }
-    let frac = (p.position_sec / p.duration_sec).clamp(0.0, 1.0);
-    let filled = (frac * CELLS as f64).round() as usize;
-    let mut bar = String::new();
-    for i in 0..CELLS {
-        bar.push_str(if i < filled { RAINBOW[i % RAINBOW.len()] } else { "⬛" });
-    }
-    Some(bar)
-}
-
 /// The second line: artist plus a compact loop/shuffle tag when relevant, so a
 /// looping playlist is visible even without the optional small-icon badges.
 /// Paused playback shows the frozen position (Discord's native bar only exists
-/// while timestamps are set, i.e. while playing), and both states end with the
-/// rainbow bar.
+/// while timestamps are set, i.e. while playing). Progress itself is left to
+/// Discord's native bar — its look (colour, playhead) is drawn by the Discord
+/// client and can't be customised by any app.
 fn build_state(p: &Presence) -> String {
     let mut parts: Vec<String> = Vec::new();
     let artist = p.artist.trim();
@@ -298,9 +279,6 @@ fn build_state(p: &Presence) -> String {
     }
     if p.shuffle {
         parts.push("🔀 Shuffle".into());
-    }
-    if let Some(bar) = rainbow_bar(p) {
-        parts.push(bar);
     }
     if parts.is_empty() {
         String::new()

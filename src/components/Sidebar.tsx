@@ -7,6 +7,7 @@ import {
   PanelLeftOpen,
 } from "lucide-react";
 import { useUIStore, type View } from "../stores/uiStore";
+import appIcon from "../assets/icon.svg";
 import "./Sidebar.css";
 
 const NAV: { id: View; label: string; icon: typeof Search }[] = [
@@ -34,7 +35,7 @@ export default function Sidebar() {
       </button>
 
       <div className="sidebar-brand">
-        <span className="brand-mark">🎵</span>
+        <img className="brand-mark" src={appIcon} alt="" />
         <span className="brand-label">Local Music</span>
       </div>
 
