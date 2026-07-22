@@ -12,10 +12,11 @@
 //!      Name it "Local Music Player" (this is the name shown after
 //!      "Listening to …" in Discord).
 //!   2. Copy its *Application ID* and paste it into `DISCORD_APP_ID` below.
-//!   3. (Optional, for the app icon) Rich Presence → Art Assets → upload a
-//!      square image named exactly `app_icon`. You can also upload optional
-//!      status badges named `play`, `pause`, `repeat`, `repeat_one`, `shuffle`
-//!      — if they're missing Discord just omits the small icon, no error.
+//!   3. (Optional) Rich Presence → Art Assets → upload optional status badges
+//!      named `play`, `pause`, `repeat`, `repeat_one`, `shuffle` — if they're
+//!      missing Discord just omits the small icon, no error. The LARGE image
+//!      needs no upload: it's fetched from `LARGE_IMAGE_URL` below (Discord
+//!      proxies external https URLs), so a new icon ships with the repo.
 //!   4. Rebuild the app. Until a real ID is set, all presence calls no-op.
 //! ──────────────────────────────────────────────────────────────────────────
 
@@ -32,6 +33,13 @@ use tauri::State;
 
 /// Your Discord application ("Client") ID. See the setup notes above.
 const DISCORD_APP_ID: &str = "1516900867373011084";
+
+/// Artwork for the activity card. Discord accepts a full https URL here and
+/// fetches it through its own media proxy, so nothing has to be uploaded to
+/// the developer portal's asset gallery — updating this file in the repo
+/// updates the icon everywhere.
+const LARGE_IMAGE_URL: &str =
+    "https://raw.githubusercontent.com/ElishaPervez/Local-music-player/main/icon-drafts/icon-b-waveform-1024.png";
 
 /// Reconnect attempts to Discord are throttled to at most one per this window,
 /// so a closed Discord doesn't get hammered on every presence update.
@@ -333,7 +341,7 @@ fn build_activity(p: &Presence) -> Activity<'static> {
     };
     let (small_image, small_text) = status_badge(p);
     let assets = Assets::new()
-        .large_image("app_icon")
+        .large_image(LARGE_IMAGE_URL)
         .large_text(large_text)
         .small_image(small_image)
         .small_text(clamp_field(&small_text));
