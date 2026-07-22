@@ -275,7 +275,11 @@ fn build_state(p: &Presence) -> String {
     if !p.is_playing {
         if p.duration_sec.is_finite() && p.duration_sec > 0.0 {
             let pos = p.position_sec.clamp(0.0, p.duration_sec);
-            parts.push(format!("⏸ {} / {}", fmt_clock(pos), fmt_clock(p.duration_sec)));
+            parts.push(format!(
+                "⏸ Paused · {} / {}",
+                fmt_clock(pos),
+                fmt_clock(p.duration_sec)
+            ));
         } else {
             parts.push("⏸ Paused".into());
         }

@@ -14,6 +14,13 @@ import { usePlayerStore } from "../stores/playerStore";
 const MIN_INTERVAL_MS = 2000;
 /** A position jump larger than this (vs. where the bar should be) is a seek. */
 const SEEK_EPSILON_SEC = 3;
+/** Watchdog: re-push the current truth this often. The frontend can't ask
+ * Discord what it's showing, so if Discord restarted (or silently dropped an
+ * update) after our last successful push, it would show nothing/stale state
+ * until the next track change. An unconditional periodic re-send bounds any
+ * such desync to ~10s, and 1 push per 10s is well inside Discord's
+ * 5-updates-per-20s activity limit. */
+const SYNC_CHECK_MS = 10000;
 
 let inited = false;
 let lastSig = "";
@@ -106,5 +113,10 @@ export function initDiscordPresence() {
   inited = true;
   usePlayerStore.subscribe(onChange);
   useLibraryStore.subscribe(onChange);
+  setInterval(() => {
+    // Nothing to show and nothing shown — don't spam clears.
+    if (!build() && lastSig === "none") return;
+    flush();
+  }, SYNC_CHECK_MS);
   onChange();
 }
