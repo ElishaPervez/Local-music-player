@@ -629,6 +629,35 @@ test("a queue where every stream lookup fails stops instead of looping", async (
   assert.ok(calls <= 4, `bounded attempt count, got ${calls}`);
 });
 
+test("a connection drop at a song change waits and retries instead of skipping the queue", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  let online = false;
+  api.resolveStream = async (url) => {
+    if (!online) throw "Unable to download webpage: getaddrinfo failed";
+    return `src:${url.split("v=")[1]}`;
+  };
+  const songs = ["off-a", "off-b", "off-c", "off-d"].map((id) => stream(id));
+
+  void usePlayerStore.getState().playQueue(songs);
+  await flush();
+  t.mock.timers.tick(1200); // the first song's own quick retry
+  await flush();
+  await flush();
+
+  // The first song is skipped, but the second failure in a row stays put.
+  assert.equal(usePlayerStore.getState().current()?.key, "key-off-b");
+  assert.equal(usePlayerStore.getState().isPlaying, false);
+  assert.match(usePlayerStore.getState().playbackError, /retrying/i);
+
+  online = true;
+  t.mock.timers.tick(3000);
+  await flush();
+  await flush();
+
+  assert.equal(usePlayerStore.getState().current()?.key, "key-off-b");
+  assert.deepEqual(playingSources(), ["src:off-b"]);
+});
+
 test("the radio resumes after a slow search even if the queue changed meanwhile", async () => {
   const mix = deferred();
   api.relatedMix = () => mix.promise;

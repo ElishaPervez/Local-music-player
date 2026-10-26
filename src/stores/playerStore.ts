@@ -32,6 +32,13 @@ const PREFETCH_FAIL_COOLDOWN_MS = 5000;
  * seconds per track while it walks to something playable. */
 const LOAD_RETRY_DELAY_MS = 1200;
 
+/** Once songs fail to load back to back, the likelier cause is a dropped
+ * connection (Wi-Fi blip, waking from sleep) rather than every song being
+ * broken. The player then stays on the song and retries it after each of
+ * these waits in turn (~1.5 min in all) instead of racing through the queue,
+ * and stops on it with the error shown if it still won't load. */
+const LOAD_BACKOFF_MS = [3000, 6000, 12000, 24000, 48000];
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Auto-player ("radio") tuning. */
@@ -320,7 +327,8 @@ interface PlayerState {
 
   _load: () => Promise<void>;
   /** Decide what happens after a song's stream lookup has failed for good:
-   *  hand off to the next track, or stop if the whole queue is failing. */
+   *  hand off to the next track, or — when songs are failing back to back —
+   *  retry this one after a growing wait and finally stop on it. */
   _afterLoadFailure: (item: PlaybackItem) => void;
   _autoTopUp: () => Promise<void>;
   _resolveSrcQuiet: (item: PlaybackItem) => Promise<string>;
@@ -1065,7 +1073,29 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     // stays on screen for that final stop.
     const failures = st._consecutiveErrors + 1;
     set({ _consecutiveErrors: failures });
-    if (failures >= st.queue.length || st.repeat === "one") return;
+    if (st.repeat === "one") return;
+    if (failures >= 2) {
+      // Back-to-back failures: stay on this song and retry it after a growing
+      // wait (see LOAD_BACKOFF_MS) rather than burning through the queue.
+      const delay = LOAD_BACKOFF_MS[failures - 2];
+      if (delay === undefined) return; // out of retries: stop here
+      const commandId = get()._playbackCommandId;
+      const reason = get().playbackError ?? "This song could not be loaded.";
+      set({ playbackError: `${reason} Retrying in ${delay / 1000}s…` });
+      setTimeout(() => {
+        const now = get();
+        // Anything the user did meanwhile (play, pause, pick a song) wins.
+        if (
+          now._playbackCommandId !== commandId ||
+          now.current()?.key !== item.key ||
+          now.isPlaying
+        )
+          return;
+        void now._load();
+      }, delay);
+      return;
+    }
+    if (failures >= st.queue.length) return;
     st.next();
   },
 
