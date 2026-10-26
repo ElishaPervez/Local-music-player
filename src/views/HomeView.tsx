@@ -7,6 +7,7 @@ import { useHistoryStore, type PlayedEntry } from "../stores/historyStore";
 import { useUIStore } from "../stores/uiStore";
 import { songToItem, resultToStreamItem } from "../lib/playback";
 import QueuePanel from "../components/QueuePanel";
+import OrbVisualizer from "../components/orb/OrbVisualizer";
 import PlaybackChoiceModal, {
   type PlaybackChoice,
 } from "../components/PlaybackChoiceModal";
@@ -79,39 +80,19 @@ export default function HomeView() {
               current ? "" : "idle"
             }`}
           >
-            <div className="disc-stage">
-              <div className="disc-glow" />
-              <button
-                className="disc"
-                onClick={() => (current ? togglePlay() : setView("finder"))}
-                title={
-                  !current
-                    ? "Nothing playing — go find a song"
-                    : isPlaying
-                      ? "Pause"
-                      : "Play"
-                }
-              >
-                <div className="disc-spin">
-                  <div className="disc-grooves" />
-                  <div className="disc-label">
-                    {current?.thumbnail ? (
-                      <img src={current.thumbnail} alt="" draggable={false} />
-                    ) : (
-                      <Music size={30} />
-                    )}
-                  </div>
-                  <div className="disc-hole" />
-                </div>
-                <div className="disc-sheen" />
-              </button>
-              <div className="tonearm">
-                <div className="tonearm-pivot" />
-                <div className="tonearm-rod">
-                  <div className="tonearm-head" />
-                </div>
-              </div>
-            </div>
+            <OrbVisualizer
+              thumbnail={current?.thumbnail}
+              isPlaying={isPlaying}
+              hasTrack={!!current}
+              title={
+                !current
+                  ? "Nothing playing — go find a song"
+                  : isPlaying
+                    ? "Pause"
+                    : "Play"
+              }
+              onClick={() => (current ? togglePlay() : setView("finder"))}
+            />
             <div className="hero-meta">
               <h1 className="hero-title" title={current?.title}>
                 {current ? current.title : "Nothing playing"}

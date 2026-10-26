@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "test": "node --test tests/playerState.test.mjs",
+    "test": "node --test tests/playerState.test.mjs tests/orb.test.mjs",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
@@ -19,9 +19,11 @@
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-store": "^2.4.3",
+    "@types/three": "^0.185.4",
     "lucide-react": "^1.17.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "three": "^0.185.1",
     "zustand": "^5.0.14"
   },
   "devDependencies": {

@@ -7,6 +7,7 @@ import {
   FolderOpen,
   Image as ImageIcon,
   Blend,
+  AudioLines,
   Wrench,
   Radio,
   Cookie,
@@ -220,6 +221,30 @@ export default function SettingsView() {
               className={`switch ${settings.crossfade ? "on" : ""}`}
               onClick={() => setSettings({ crossfade: !settings.crossfade })}
               title="Toggle crossfade"
+            >
+              <span className="switch-knob" />
+            </button>
+          </div>
+
+          <div className="setting-row">
+            <div className="setting-info">
+              <AudioLines size={18} />
+              <div>
+                <strong>Wide stereo</strong>
+                <p>
+                  Spread instruments out past the speakers while vocals stay
+                  centred — best on headphones
+                </p>
+              </div>
+            </div>
+            <button
+              role="switch"
+              aria-checked={settings.stereoWiden}
+              className={`switch ${settings.stereoWiden ? "on" : ""}`}
+              onClick={() =>
+                setSettings({ stereoWiden: !settings.stereoWiden })
+              }
+              title="Toggle wide stereo"
             >
               <span className="switch-knob" />
             </button>

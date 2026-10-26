@@ -13,6 +13,7 @@ class FakeAudio {
     this.duration = 0;
     this.volume = 1;
     this.paused = true;
+    this.ended = false;
     this.error = null;
     this.listeners = new Map();
     FakeAudio.instances.push(this);
@@ -43,6 +44,7 @@ class FakeAudio {
     this.duration = 0;
     this.volume = 1;
     this.paused = true;
+    this.ended = false;
     this.error = null;
   }
 }
@@ -404,6 +406,30 @@ test("pausing while a crossfade target resolves prevents it from starting", asyn
   assert.deepEqual(playingSources(), []);
 });
 
+test("a crossfade that fails after the old song ended still moves on", async () => {
+  const a = stream("fade-end-a", "src:fade-end-a");
+  const b = stream("fade-end-b", "src:fade-end-b");
+  await usePlayerStore.getState().playQueue([a, b]);
+  usePlayerStore.setState({ crossfade: true, crossfadeArmedFor: 0 });
+  const starting = deferred();
+  FakeAudio.nextPlayPromise = starting.promise;
+
+  const fade = usePlayerStore.getState()._startCrossfade(1);
+  await flush();
+  // The old song runs out while the next one is still trying to start...
+  const outgoing = FakeAudio.instances.find((el) => el.src === "src:fade-end-a");
+  outgoing.ended = true;
+  outgoing.paused = true;
+  // ...and then the next one fails to start.
+  starting.reject(new Error("network"));
+  await fade;
+  await flush();
+
+  assert.equal(usePlayerStore.getState().current()?.key, b.key);
+  assert.equal(usePlayerStore.getState().isPlaying, true);
+  assert.deepEqual(playingSources(), ["src:fade-end-b"]);
+});
+
 test("renaming a library song updates its live queue and now-playing copy", () => {
   const song = librarySong("rename", "Old title");
   const item = queuedLibrarySong("rename", "Old title");
@@ -437,7 +463,8 @@ test("a successful retry clears the previous playback error", async () => {
   let attempts = 0;
   api.resolveStream = async () => {
     attempts += 1;
-    if (attempts === 1) throw "Saved cookies expired.";
+    // Both attempts of the first load fail, so the error reaches the screen.
+    if (attempts <= 2) throw "Saved cookies expired.";
     return "src:cookie-retry";
   };
   const item = stream("cookie-retry");
@@ -450,6 +477,137 @@ test("a successful retry clears the previous playback error", async () => {
 
   assert.equal(usePlayerStore.getState().playbackError, null);
   assert.deepEqual(playingSources(), ["src:cookie-retry"]);
+});
+
+test("a failed background prefetch does not poison the song's real load", async () => {
+  const first = deferred();
+  let calls = 0;
+  api.resolveStream = async () => {
+    calls += 1;
+    if (calls === 1) return first.promise;
+    return "src:fresh";
+  };
+  const item = stream("shared-failure");
+
+  // The background prefetch starts first; the real load joins while it's still
+  // in flight and must NOT simply inherit its failure.
+  const background = usePlayerStore.getState()._resolveSrcQuiet(item);
+  const foreground = usePlayerStore.getState()._resolveSrcQuiet(item);
+  background.catch(() => {}); // failing on purpose; keep the runner quiet
+
+  first.reject("Throttled by YouTube.");
+
+  await assert.rejects(background);
+  assert.equal(await foreground, "src:fresh");
+  assert.equal(calls, 2, "the real load must make its own request");
+});
+
+test("a song whose stream lookup keeps failing hands off to the next song", async () => {
+  api.resolveStream = async (url) => {
+    if (url.includes("dead-song")) throw "Stream unavailable.";
+    return "src:live-song";
+  };
+
+  await usePlayerStore.getState().playQueue([stream("dead-song"), stream("live-song")]);
+  await flush();
+  await flush();
+
+  assert.equal(usePlayerStore.getState().current()?.key, "key-live-song");
+  assert.deepEqual(playingSources(), ["src:live-song"]);
+});
+
+test("a queue where every stream lookup fails stops instead of looping", async () => {
+  let calls = 0;
+  api.resolveStream = async () => {
+    calls += 1;
+    throw "Stream unavailable.";
+  };
+
+  await usePlayerStore
+    .getState()
+    .playQueue([stream("dead-1"), stream("dead-2")]);
+  await flush();
+  await flush();
+
+  assert.equal(usePlayerStore.getState().isPlaying, false);
+  assert.match(usePlayerStore.getState().playbackError, /unavailable/i);
+  assert.deepEqual(playingSources(), []);
+  // 2 attempts on the first track (one retry), then 1 each as it walks the
+  // rest — bounded, not an endless error→next→error spin.
+  assert.ok(calls <= 4, `bounded attempt count, got ${calls}`);
+});
+
+test("the radio resumes after a slow search even if the queue changed meanwhile", async () => {
+  const mix = deferred();
+  api.relatedMix = () => mix.promise;
+  api.resolveStream = async () => "src:radio-c";
+  const a = stream("radio-a", "src:radio-a");
+  const b = stream("radio-b", "src:radio-b");
+  usePlayerStore.setState({
+    queue: [a, b],
+    index: 1,
+    isPlaying: true,
+    autoPlay: true,
+  });
+
+  // Last song ends with nothing left: playback parks and the search starts.
+  usePlayerStore.getState().next();
+  await flush();
+  assert.equal(usePlayerStore.getState().isPlaying, false);
+
+  // The queue changes length while the search is still running.
+  usePlayerStore.getState().removeFromQueue(a.key);
+  mix.resolve([searchResult("radio-c")]);
+  await flush();
+  await flush();
+  await flush();
+
+  assert.equal(usePlayerStore.getState().current()?.videoId, "radio-c");
+  assert.equal(usePlayerStore.getState().isPlaying, true);
+  assert.deepEqual(playingSources(), ["src:radio-c"]);
+});
+
+test("a fruitless radio search still schedules a retry after the queue changed", async () => {
+  const mix = deferred();
+  api.relatedMix = () => mix.promise;
+  const a = stream("dry-a", "src:dry-a");
+  const b = stream("dry-b", "src:dry-b");
+  usePlayerStore.setState({
+    queue: [a, b],
+    index: 1,
+    isPlaying: true,
+    autoPlay: true,
+  });
+
+  usePlayerStore.getState().next();
+  await flush();
+  usePlayerStore.getState().removeFromQueue(a.key);
+  mix.resolve([]); // empty mix — nothing to append
+  await flush();
+  await flush();
+
+  const timer = usePlayerStore.getState()._autoRetryTimer;
+  assert.notEqual(timer, null, "a stranded radio must schedule another attempt");
+  clearTimeout(timer);
+  usePlayerStore.setState({ _autoRetryTimer: null });
+});
+
+test("a user pause is never mistaken for the radio running dry", async () => {
+  api.relatedMix = async () => [searchResult("unwanted")];
+  const a = stream("pause-a", "src:pause-a");
+  const b = stream("pause-b", "src:pause-b");
+  await usePlayerStore.getState().playQueue([a, b]);
+  usePlayerStore.setState({ autoPlay: true });
+  usePlayerStore.getState().togglePlay(); // user pauses on the first track
+  assert.equal(usePlayerStore.getState().isPlaying, false);
+
+  await usePlayerStore.getState()._autoTopUp();
+  await flush();
+
+  // Songs may be appended, but a paused player must stay paused and stay put.
+  assert.equal(usePlayerStore.getState().isPlaying, false);
+  assert.equal(usePlayerStore.getState().index, 0);
+  assert.deepEqual(playingSources(), []);
 });
 
 test("deleting the source playlist detaches the live queue without stopping it", () => {

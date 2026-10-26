@@ -142,6 +142,30 @@ impl StreamProxy {
     }
 }
 
+/// Permission for the webview to let the audio processing chain read these
+/// samples. A wildcard is safe here: the port is loopback-only and every
+/// request still has to carry the per-run token.
+fn cors_headers() -> [(&'static str, &'static str); 2] {
+    [
+        ("Access-Control-Allow-Origin", "*"),
+        (
+            "Access-Control-Expose-Headers",
+            "Content-Range, Content-Length, Accept-Ranges",
+        ),
+    ]
+}
+
+/// Answer for a preflight check. Media elements ask for single byte ranges,
+/// which browsers send without preflighting, so this is belt-and-braces.
+fn preflight_headers() -> [(&'static str, &'static str); 4] {
+    [
+        ("Access-Control-Allow-Origin", "*"),
+        ("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS"),
+        ("Access-Control-Allow-Headers", "Range"),
+        ("Access-Control-Max-Age", "86400"),
+    ]
+}
+
 fn handle_request(
     client: &reqwest::blocking::Client,
     entries: &Mutex<HashMap<String, Entry>>,
@@ -157,6 +181,20 @@ fn handle_request(
         let _ = request.respond(tiny_http::Response::empty(403));
         return;
     }
+    // The audio element asks for these responses in CORS mode so the stereo
+    // widening chain is allowed to read the samples; without the permission
+    // below the webview hands that chain silence instead of the song.
+    if request.method() == &tiny_http::Method::Options {
+        let mut response = tiny_http::Response::empty(204);
+        for (name, value) in preflight_headers() {
+            if let Ok(header) = tiny_http::Header::from_bytes(name.as_bytes(), value.as_bytes()) {
+                response.add_header(header);
+            }
+        }
+        let _ = request.respond(response);
+        return;
+    }
+
     let upstream = path.strip_prefix("/s/").and_then(|handle| {
         let entries = entries.lock().unwrap_or_else(|e| e.into_inner());
         entries.get(handle).map(|entry| entry.upstream.clone())
@@ -196,6 +234,11 @@ fn handle_request(
     }
     if let Ok(header) = tiny_http::Header::from_bytes(&b"Accept-Ranges"[..], &b"bytes"[..]) {
         headers.push(header);
+    }
+    for (name, value) in cors_headers() {
+        if let Ok(header) = tiny_http::Header::from_bytes(name.as_bytes(), value.as_bytes()) {
+            headers.push(header);
+        }
     }
     let length = response.content_length().map(|l| l as usize);
     // Streams the upstream body straight through; respond() only fails if the

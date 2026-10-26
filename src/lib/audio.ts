@@ -1,6 +1,12 @@
 /** How often the crossfade ramp re-applies volumes (~20 updates/sec). */
 const FADE_TICK_MS = 50;
 
+/** Side-channel boost while stereo widening is on. 1 reproduces the input
+ *  untouched, so this is how far past "normal stereo" the effect pushes. */
+const WIDE_SIDE_GAIN = 1.9;
+/** Seconds the width change ramps over, so flipping the toggle never clicks. */
+const WIDTH_RAMP_SEC = 0.15;
+
 /**
  * Two HTMLAudioElements so playback can crossfade: while one track fades out,
  * the next plays and fades in on the other element. With crossfade off only the
@@ -24,6 +30,26 @@ class AudioController {
     done: () => void;
   };
 
+  /**
+   * Processing chain, built once at startup. It carries stereo widening AND
+   * the read-only tap the Home-screen visualiser listens to, so it exists even
+   * with widening switched off — an element can only ever be tapped once, so
+   * there is no way to add the visualiser's listener later on a separate path.
+   * At width 1 the chain reproduces its input exactly, so "off" costs nothing.
+   */
+  private graph: {
+    ctx: AudioContext;
+    /** Per-element level control; replaces `el.volume` once routed. */
+    gains: Map<HTMLAudioElement, GainNode>;
+    /** Gain on the L−R difference: 1 = untouched, higher = wider. */
+    side: GainNode;
+    /** Listen-only branch: measures the output without being part of the path
+     *  to the speakers, so nothing it does can alter what you hear. */
+    analyser: AnalyserNode;
+  } | null = null;
+  /** Set if building the chain ever throws; playback then just runs dry. */
+  private graphFailed = false;
+
   onEnded?: () => void;
   onTime?: (current: number, duration: number) => void;
   onError?: (e: unknown) => void;
@@ -31,7 +57,138 @@ class AudioController {
 
   constructor() {
     this.els = [new Audio(), new Audio()];
-    for (const el of this.els) el.preload = "auto";
+    for (const el of this.els) {
+      el.preload = "auto";
+      // Must be set before any src is assigned. Without it the webview treats
+      // the audio as foreign and the widening chain would only ever receive
+      // silence. Both sources we play — the asset protocol for library files
+      // and the loopback proxy for streams — return the matching permission.
+      el.crossOrigin = "anonymous";
+    }
+  }
+
+  /**
+   * Level for one element. Once the chain exists the element's own volume is
+   * left wide open and levels are set inside the chain instead, so crossfades
+   * don't depend on where the element's volume control sits relative to the
+   * point the chain taps its output.
+   */
+  private setGain(el: HTMLAudioElement, v: number) {
+    const gain = this.graph?.gains.get(el);
+    if (gain) gain.gain.value = v;
+    else el.volume = v;
+  }
+
+  /** The context suspends itself when the app is idle/hidden; playback through
+   *  it would then be silent, so every start path wakes it first. */
+  private wake() {
+    const ctx = this.graph?.ctx;
+    if (ctx && ctx.state !== "running") void ctx.resume();
+  }
+
+  /**
+   * Build the chain and route both elements into it.
+   *
+   * Mid/side: mid = (L+R)/2 is what both ears share, side = (L−R)/2 is what
+   * separates them. Rebuilding as mid ± side*width leaves anything centred
+   * (vocals, bass) exactly where it was and pushes the rest further out. At
+   * width 1 the two halves recombine into the original signal bit for bit,
+   * which is what makes "off" free rather than a second code path.
+   */
+  private ensureGraph() {
+    if (this.graph || this.graphFailed) return;
+    try {
+      const ctx = new AudioContext();
+
+      // Both elements sum in here. Forcing stereo means a mono track still
+      // reaches both ears (its side signal is zero, so widening correctly
+      // leaves it alone) instead of collapsing into the left channel.
+      const preSplit = ctx.createGain();
+      preSplit.channelCount = 2;
+      preSplit.channelCountMode = "explicit";
+      preSplit.channelInterpretation = "speakers";
+
+      const splitter = ctx.createChannelSplitter(2);
+      const merger = ctx.createChannelMerger(2);
+      const mid = ctx.createGain();
+      const side = ctx.createGain();
+      const sideInverted = ctx.createGain();
+      side.gain.value = 1; // untouched until setWiden turns it up
+      sideInverted.gain.value = -1;
+
+      const halved = (sign: number) => {
+        const g = ctx.createGain();
+        g.gain.value = 0.5 * sign;
+        return g;
+      };
+      const leftToMid = halved(1);
+      const rightToMid = halved(1);
+      const leftToSide = halved(1);
+      const rightToSide = halved(-1);
+
+      preSplit.connect(splitter);
+      splitter.connect(leftToMid, 0);
+      splitter.connect(rightToMid, 1);
+      splitter.connect(leftToSide, 0);
+      splitter.connect(rightToSide, 1);
+      leftToMid.connect(mid);
+      rightToMid.connect(mid);
+      leftToSide.connect(side);
+      rightToSide.connect(side);
+      side.connect(sideInverted);
+      mid.connect(merger, 0, 0);
+      mid.connect(merger, 0, 1);
+      side.connect(merger, 0, 0);
+      sideInverted.connect(merger, 0, 1);
+      merger.connect(ctx.destination);
+
+      // Hangs off the output as a dead end — it is deliberately NOT connected
+      // onward to the speakers, so it can only ever observe.
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      // Some averaging happens here for free; the rest of the smoothing is
+      // done where the readings are used, which needs the frame timing.
+      analyser.smoothingTimeConstant = 0.55;
+      analyser.minDecibels = -85;
+      analyser.maxDecibels = -12;
+      merger.connect(analyser);
+
+      const gains = new Map<HTMLAudioElement, GainNode>();
+      for (const el of this.els) {
+        const source = ctx.createMediaElementSource(el);
+        const gain = ctx.createGain();
+        gain.gain.value = el.volume; // carry the current level across
+        el.volume = 1;
+        source.connect(gain);
+        gain.connect(preSplit);
+        gains.set(el, gain);
+      }
+      this.graph = { ctx, gains, side, analyser };
+    } catch (error) {
+      // Never surfaced through onError: that path treats a failure as a bad
+      // track and skips it. Losing the effect must not cost you the song, and
+      // the visualiser falls back to animating on a clock.
+      this.graphFailed = true;
+      console.error("audio processing chain unavailable:", error);
+    }
+  }
+
+  /** The visualiser's listener, or null if the chain couldn't be built. */
+  getAnalyser(): AnalyserNode | null {
+    return this.graph?.analyser ?? null;
+  }
+
+  /** Turn stereo widening on or off. Applies to whatever is already playing;
+   *  the ramp keeps the change from clicking. */
+  setWiden(on: boolean) {
+    if (on) this.ensureGraph();
+    const g = this.graph;
+    if (!g) return;
+    this.wake();
+    const now = g.ctx.currentTime;
+    g.side.gain.cancelScheduledValues(now);
+    g.side.gain.setValueAtTime(g.side.gain.value, now);
+    g.side.gain.linearRampToValueAtTime(on ? WIDE_SIDE_GAIN : 1, now + WIDTH_RAMP_SEC);
   }
 
   private get activeEl() {
@@ -44,6 +201,9 @@ class AudioController {
   init() {
     if (this.wired) return;
     this.wired = true;
+    // Built up front rather than on demand: the visualiser's listener can only
+    // be attached to an element once, before anything has played through it.
+    this.ensureGraph();
     // Both elements are wired, but only the active one drives the store.
     for (const el of this.els) {
       const emitTime = () => {
@@ -71,7 +231,8 @@ class AudioController {
     const el = this.activeEl;
     el.src = src;
     el.load();
-    el.volume = this.masterVolume;
+    this.setGain(el, this.masterVolume);
+    this.wake();
     await el.play();
   }
 
@@ -88,7 +249,7 @@ class AudioController {
     const el = this.idleEl;
     el.src = src;
     el.load();
-    el.volume = 0; // stays silent; crossfadeTo / playPrimed set the real volume
+    this.setGain(el, 0); // stays silent; crossfadeTo / playPrimed set the real volume
     this.primedSrc = src;
   }
 
@@ -110,7 +271,8 @@ class AudioController {
       this.active = this.active === 0 ? 1 : 0; // primed idle becomes active
       this.primedSrc = null;
       const el = this.activeEl; // now the formerly-idle, primed element
-      el.volume = this.masterVolume;
+      this.setGain(el, this.masterVolume);
+      this.wake();
       await el.play();
       // Snap the UI to the new element's time immediately.
       this.onTime?.(el.currentTime, el.duration || 0);
@@ -140,9 +302,10 @@ class AudioController {
       inEl.src = src;
       inEl.load();
     }
-    inEl.volume = 0;
+    this.setGain(inEl, 0);
     this.primedSrc = null; // it's being consumed by the fade now
     this.crossfading = true;
+    this.wake();
     try {
       await inEl.play();
     } catch {
@@ -166,7 +329,7 @@ class AudioController {
           /* some sources disallow seeking; harmless */
         }
         this.active = this.active === 0 ? 1 : 0; // inEl is now active
-        inEl.volume = this.masterVolume;
+        this.setGain(inEl, this.masterVolume);
         this.crossfading = false;
         this.fade = undefined;
         onDone();
@@ -199,8 +362,8 @@ class AudioController {
     f.lastTs = now;
     const p = f.durationMs <= 0 ? 1 : Math.min(1, f.elapsed / f.durationMs);
     // Equal-power curve keeps perceived loudness roughly steady through the mix.
-    f.outEl.volume = this.masterVolume * Math.cos((p * Math.PI) / 2);
-    f.inEl.volume = this.masterVolume * Math.sin((p * Math.PI) / 2);
+    this.setGain(f.outEl, this.masterVolume * Math.cos((p * Math.PI) / 2));
+    this.setGain(f.inEl, this.masterVolume * Math.sin((p * Math.PI) / 2));
     if (p >= 1) {
       if (f.timer != null) {
         clearInterval(f.timer);
@@ -224,6 +387,11 @@ class AudioController {
     return this.fade != null;
   }
 
+  /** True once the audible track has played through to its end. */
+  get activeEnded() {
+    return this.activeEl.ended;
+  }
+
   /**
    * Abort an in-flight crossfade and stay on the outgoing (still-active) track
    * at full volume — used when the user seeks or hits Previous mid-fade.
@@ -238,10 +406,11 @@ class AudioController {
     } catch {
       /* ignore */
     }
-    this.activeEl.volume = this.masterVolume;
+    this.setGain(this.activeEl, this.masterVolume);
   }
 
   resume() {
+    this.wake();
     if (this.fade) {
       void this.fade.outEl.play();
       void this.fade.inEl.play();
@@ -266,7 +435,7 @@ class AudioController {
   setVolume(v: number) {
     this.masterVolume = Math.max(0, Math.min(1, v));
     // During a fade, fadeTick re-applies volume each frame.
-    if (!this.fade) this.activeEl.volume = this.masterVolume;
+    if (!this.fade) this.setGain(this.activeEl, this.masterVolume);
   }
 }
 

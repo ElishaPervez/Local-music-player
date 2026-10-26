@@ -44,6 +44,8 @@ export interface Settings {
   background: BackgroundConfig | null;
   /** Fade the last seconds of each track into the next. */
   crossfade: boolean;
+  /** Widen the stereo image so instruments spread past the speakers. */
+  stereoWiden: boolean;
   /** Broadcast the currently-playing song to Discord (Rich Presence). */
   discordPresence: boolean;
   /** Auto-append similar (streamed) songs to keep the queue going. */

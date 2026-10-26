@@ -1,0 +1,36 @@
+/* ————————————————————————————— The orb ————————————————————————————— */
+
+/* Holds the record's old footprint in the layout, so swapping the visual in
+   doesn't move anything else on the page. */
+.orb-stage {
+  position: relative;
+}
+
+/* Overhangs the layout box on every side (see OrbVisualizer) so particles and
+   glow spill into the space around the orb without taking up room. */
+.orb-canvas {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+}
+
+/* Click and drag target: the orb's own circle, over the drawing surface. The
+   button itself is invisible — every bit of feedback comes from the orb. */
+.orb-hit {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: grab;
+  /* Without this, dragging the orb on a touchscreen scrolls the page instead. */
+  touch-action: none;
+}
+.orb-hit:active {
+  cursor: grabbing;
+}
+.orb-hit:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 6px;
+}

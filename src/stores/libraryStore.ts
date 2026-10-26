@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { Playlist, Settings, Song } from "../lib/types";
 import { api } from "../lib/api";
 import { loadAll, saveAll } from "../lib/persist";
+import { audio } from "../lib/audio";
 import { songToItem } from "../lib/playback";
 import { usePlayerStore } from "./playerStore";
 
@@ -33,6 +34,7 @@ const DEFAULT_SETTINGS: Settings = {
   audioFormat: "m4a",
   background: null,
   crossfade: false,
+  stereoWiden: false,
   discordPresence: true,
   autoPlay: false,
 };
@@ -69,6 +71,9 @@ export const useLibraryStore = create<LibraryState>((set, get) => {
       set({ ...data, loaded: true });
       // Mirror the persisted crossfade preference into the player runtime.
       usePlayerStore.getState().setCrossfade(data.settings.crossfade);
+      // The chain itself already exists (the visualiser listens through it);
+      // this only opens the width up if the preference was saved as on.
+      if (data.settings.stereoWiden) audio.setWiden(true);
       // The auto-player de-dupes its picks against downloaded songs; push the
       // current library videoIds in (avoids a playerStore → libraryStore cycle)
       // BEFORE enabling auto-play, so the de-dupe set is populated before any
@@ -197,6 +202,9 @@ export const useLibraryStore = create<LibraryState>((set, get) => {
       persist();
       if (patch.crossfade !== undefined) {
         usePlayerStore.getState().setCrossfade(patch.crossfade);
+      }
+      if (patch.stereoWiden !== undefined) {
+        audio.setWiden(patch.stereoWiden);
       }
       if (patch.autoPlay !== undefined) {
         usePlayerStore.getState().setAutoPlay(patch.autoPlay);

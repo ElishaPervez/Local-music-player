@@ -24,6 +24,16 @@ const PREFETCH_LEAD_SEC = 12;
  * attempts over its lead window instead of one per tick. */
 const PREFETCH_FAIL_COOLDOWN_MS = 5000;
 
+/** A stream lookup that fails at the moment a song must start is usually a
+ * momentary throttle or network blip, so the load gets one more attempt this
+ * long afterwards before the track is given up on. Only the FIRST failure of a
+ * run earns it: once tracks are failing back-to-back the cause is no longer
+ * transient, and waiting between each one would just stall the queue for
+ * seconds per track while it walks to something playable. */
+const LOAD_RETRY_DELAY_MS = 1200;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 /** Auto-player ("radio") tuning. */
 const AUTO_LOW_WATER = 3; // top up when this many or fewer unplayed tracks remain
 const AUTO_BATCH = 18; // candidates requested per Mix fetch
@@ -255,6 +265,14 @@ interface PlayerState {
    * audio is paused (no timeupdate events fire to re-trigger the low-water
    * check). null when no retry is scheduled. */
   _autoRetryTimer: ReturnType<typeof setTimeout> | null;
+  /** True while playback is stopped ONLY because the radio ran out of queue and
+   * is off fetching more — i.e. next() hit the end with auto-play on. This is
+   * what tells a finishing top-up "you may resume playback". It must never be
+   * inferred from position (the old `index === length-1` test), because a slow
+   * Mix fetch can outlive queue edits and error-skips that move the index, and
+   * the mis-inference then strands a still-on radio silently. Cleared by any
+   * real load and by the user's own play/pause. */
+  _autoParked: boolean;
   /** VideoIds of downloaded library songs, mirrored from libraryStore. */
   _libraryVideoIds: string[];
   /** Where the queue should continue after a temporary song finishes. */
@@ -301,6 +319,9 @@ interface PlayerState {
   _finishPlayOnce: () => Promise<void>;
 
   _load: () => Promise<void>;
+  /** Decide what happens after a song's stream lookup has failed for good:
+   *  hand off to the next track, or stop if the whole queue is failing. */
+  _afterLoadFailure: (item: PlaybackItem) => void;
   _autoTopUp: () => Promise<void>;
   _resolveSrcQuiet: (item: PlaybackItem) => Promise<string>;
   _prefetchNext: (nextIndex: number) => Promise<void>;
@@ -340,6 +361,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   _autoTopUpInFlight: false,
   _autoSessionId: 0,
   _autoCooldownUntil: 0,
+  _autoParked: false,
   _recentVideoIds: [],
   _deadSeeds: new Set<string>(),
   _autoRetryTimer: null,
@@ -372,6 +394,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       _autoTopUpInFlight: false,
       _autoCooldownUntil: 0,
       _autoRetryTimer: null,
+      _autoParked: false,
     }));
     for (const item of items) get()._enrichStreamItem(item);
     await get()._load();
@@ -396,6 +419,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       _autoTopUpInFlight: false,
       _autoCooldownUntil: 0,
       _autoRetryTimer: null,
+      _autoParked: false,
     }));
     await get()._load();
   },
@@ -449,6 +473,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       _autoTopUpInFlight: false,
       _autoCooldownUntil: 0,
       _autoRetryTimer: null,
+      _autoParked: false,
     });
     get()._enrichStreamItem(item);
     await get()._load();
@@ -498,6 +523,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       set({
         isPlaying: false,
         loadingStream: false,
+        // A deliberate pause is not the radio waiting for more songs.
+        _autoParked: false,
         _playbackCommandId: st._playbackCommandId + 1,
       });
       return;
@@ -507,7 +534,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       return;
     }
     const commandId = st._playbackCommandId + 1;
-    set({ isPlaying: true, _playbackCommandId: commandId });
+    // Pressing play while the radio was parked (replaying the finished track)
+    // takes ownership of playback — a top-up landing later must not jump the
+    // user forward mid-song.
+    set({ isPlaying: true, _autoParked: false, _playbackCommandId: commandId });
     audio.resume().catch(() => {
       if (get()._playbackCommandId === commandId) set({ isPlaying: false });
     });
@@ -540,8 +570,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       } else if (get().autoPlay) {
         // Out of runway under auto-play — fetch more rather than declaring the
         // session over; _autoTopUp resumes playback once it appends something.
+        // The flag is how that top-up knows this stop was the radio's doing and
+        // not the user pressing pause.
         audio.pause();
-        set({ isPlaying: false });
+        set({ isPlaying: false, _autoParked: true });
         void get()._autoTopUp();
         return;
       } else {
@@ -713,6 +745,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       _autoTopUpInFlight: false,
       _autoCooldownUntil: 0,
       _autoRetryTimer: null,
+      _autoParked: false,
     });
     // Top up now, but only if the queue is actually short — _autoTopUp guards
     // itself with the same LOW_WATER runway check used by the _onTime trigger,
@@ -868,6 +901,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       _autoTopUpInFlight: false,
       _autoCooldownUntil: 0,
       _autoRetryTimer: null,
+      _autoParked: false,
       _oneOffResume: null,
       _resumePosition: null,
     }));
@@ -938,44 +972,84 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const isCurrentCommand = () =>
       get()._playbackCommandId === commandId &&
       get().current()?.key === item.key;
-    try {
-      const src = await get()._resolveSrcQuiet(item);
-      if (!isCurrentCommand()) return;
-      audio.setVolume(get().volume);
-      // Mark the command as playing before awaiting the browser's play promise.
-      // A click during that promise must be interpreted as Pause, not as a
-      // request to start a second load of the same item.
-      set({ isPlaying: true, loadingStream: false });
-      await audio.playPrimed(src);
-      if (!isCurrentCommand()) return;
-      const resumePosition = get()._resumePosition;
-      if (resumePosition != null) {
-        audio.seek(resumePosition);
+    // A real load supersedes the radio's end-of-queue park: whatever happens
+    // from here, playback is no longer waiting on a top-up to restart it.
+    if (get()._autoParked) set({ _autoParked: false });
+    // Give a first stumble one more attempt before giving up on the track. Once
+    // tracks are failing back-to-back the cause isn't transient any more, so
+    // skip the extra wait and let the queue walk to something playable.
+    const attempts = get()._consecutiveErrors === 0 ? 2 : 1;
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      if (attempt > 0) {
+        await sleep(LOAD_RETRY_DELAY_MS);
+        if (!isCurrentCommand()) return;
       }
-      // NOTE: do NOT reset _consecutiveErrors here. audio.play() resolves when
-      // playback merely *starts*; a track that then fails surfaces its failure
-      // asynchronously via the element's `error` event. Resetting on start would
-      // zero the counter before each failure is counted, so the "whole queue
-      // failed" guard in _onPlaybackError could never trip and a playlist of
-      // broken tracks would loop error→next→_load→error forever (UI freeze).
-      // The counter is cleared only on real progress (see _onTime).
-      set({
-        isPlaying: true,
-        loadingStream: false,
-        position: 0,
-        _loadedKey: item.key,
-        _resumePosition: null,
-      });
-      if (resumePosition != null) set({ position: resumePosition });
-    } catch (e) {
-      if (!isCurrentCommand()) return;
-      set({
-        isPlaying: false,
-        loadingStream: false,
-        playbackError: errorMessage(e),
-        _loadedKey: null,
-      });
+      try {
+        const src = await get()._resolveSrcQuiet(item);
+        if (!isCurrentCommand()) return;
+        audio.setVolume(get().volume);
+        // Mark the command as playing before awaiting the browser's play
+        // promise. A click during that promise must be interpreted as Pause,
+        // not as a request to start a second load of the same item.
+        set({ isPlaying: true, loadingStream: false });
+        await audio.playPrimed(src);
+        if (!isCurrentCommand()) return;
+        const resumePosition = get()._resumePosition;
+        if (resumePosition != null) {
+          audio.seek(resumePosition);
+        }
+        // NOTE: do NOT reset _consecutiveErrors here. audio.play() resolves when
+        // playback merely *starts*; a track that then fails surfaces its failure
+        // asynchronously via the element's `error` event. Resetting on start would
+        // zero the counter before each failure is counted, so the "whole queue
+        // failed" guard in _onPlaybackError could never trip and a playlist of
+        // broken tracks would loop error→next→_load→error forever (UI freeze).
+        // The counter is cleared only on real progress (see _onTime).
+        set({
+          isPlaying: true,
+          loadingStream: false,
+          position: 0,
+          _loadedKey: item.key,
+          _resumePosition: null,
+        });
+        if (resumePosition != null) set({ position: resumePosition });
+        return;
+      } catch (e) {
+        if (!isCurrentCommand()) return;
+        // Keep the spinner up while the retry is pending — flashing an error
+        // that we're about to try to clear reads as a failure that isn't final.
+        if (attempt < attempts - 1) continue;
+        set({
+          isPlaying: false,
+          loadingStream: false,
+          playbackError: errorMessage(e),
+          _loadedKey: null,
+        });
+      }
     }
+    // Out of attempts. Every other failure in this player recovers itself; this
+    // one used to dead-end here, which is what stranded a radio queue on the
+    // song it had just finished.
+    get()._afterLoadFailure(item);
+  },
+
+  _afterLoadFailure: (item) => {
+    const st = get();
+    // A temporary song is outside the queue — there is nothing to advance to.
+    if (st.oneOffItem) {
+      void st._finishPlayOnce();
+      return;
+    }
+    // Something else already took over (user click, crossfade adoption).
+    if (st.current()?.key !== item.key) return;
+    // Same policy as a track the audio engine rejects: hand off to the next
+    // song, but stop once a whole queue's worth has failed in a row so a dead
+    // source (or repeat-all) can't spin forever. The error text set by _load
+    // stays on screen for that final stop.
+    const failures = st._consecutiveErrors + 1;
+    set({ _consecutiveErrors: failures });
+    if (failures >= st.queue.length || st.repeat === "one") return;
+    st.next();
   },
 
   _autoTopUp: async () => {
@@ -1003,11 +1077,6 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       // offline playlist can fall back), then any other queue items. Skip
       // known-dead seeds.
       const seeds = buildSeedPool(get());
-      // Remember where the tail was BEFORE appending: if next()'s safety net
-      // parked us at end-of-queue (index on the just-finished last track), the
-      // first newly-appended item lives at this position. Resuming there avoids
-      // replaying the song that just ended.
-      const preLen = get().queue.length;
 
       // Bound the per-tick yt-dlp fan-out. Cached dead-seed skips don't count —
       // they never reach the call — so this only limits real fetches.
@@ -1063,31 +1132,31 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
       if (!sessionIsCurrent()) return;
 
-      // If we parked at end-of-queue (next()'s safety net) and just added
-      // songs, resume from the FIRST appended track — not the current index,
-      // which still points at the song that just finished.
+      // If the radio parked playback (next()'s end-of-queue safety net) and we
+      // just added songs, resume from the track AFTER the one it parked on.
       //
       // Re-evaluate the parked state AFTER the awaits, never from a snapshot
       // taken before them: a top-up that started from _onTime while the track
       // was still playing would have snapshotted "not parked", yet by the time
       // the slow Mix fetch resolves the queue can have drained and next()'s
-      // safety net parked us at the old tail (isPlaying=false, index pointing
-      // at the just-finished last track). The guard must reflect that current
-      // reality, or the freshly-extended queue would sit paused forever.
+      // safety net parked us. The guard must reflect that current reality, or
+      // the freshly-extended queue would sit paused forever.
+      //
+      // The park is read from the explicit flag rather than inferred from the
+      // index sitting at the old tail. A Mix fetch can take tens of seconds,
+      // and anything that shifts the index meanwhile — the user removing a
+      // track, or a failed track being skipped — used to break that positional
+      // guess, at which point NEITHER the resume nor the retry below ran and
+      // the radio went silent for good.
       const after = get();
-      const parkedAtEnd = !after.isPlaying && after.index === preLen - 1;
-      if (
-        appended > 0 &&
-        parkedAtEnd &&
-        preLen < after.queue.length &&
-        after.autoPlay
-      ) {
+      const parked = after._autoParked && !after.isPlaying && after.autoPlay;
+      const resumeIndex = after.index + 1;
+      if (appended > 0 && parked && resumeIndex < after.queue.length) {
         // Resuming for real — drop any pending parked-retry timer.
         if (after._autoRetryTimer != null) {
           clearTimeout(after._autoRetryTimer);
           set({ _autoRetryTimer: null });
         }
-        const resumeIndex = Math.min(preLen, after.queue.length - 1);
         // The queue ran completely dry, so the first appended item was never
         // prefetched/primed — resolve + pre-buffer it now, then resume. _load's
         // playPrimed then adopts the warmed element rather than cold-loading, so
@@ -1113,9 +1182,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
           }
         }
         if (!sessionIsCurrent()) return;
-        set({ index: resumeIndex });
+        // _load clears _autoParked itself; set it here too so nothing observes
+        // a resumed player still flagged as waiting for songs.
+        set({ index: resumeIndex, _autoParked: false });
         void get()._load();
-      } else if (appended === 0 && parkedAtEnd && after.autoPlay) {
+      } else if (appended === 0 && parked) {
         // Parked at end-of-queue but this tick appended nothing (transient
         // empty mix, a throttle that broke out, or everything filtered out).
         // Audio is paused, so no timeupdate will fire to re-run the low-water
@@ -1129,6 +1200,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
           if (
             s.autoPlay &&
             s._autoSessionId === sessionId &&
+            s._autoParked &&
             !s.isPlaying &&
             !s._autoTopUpInFlight
           ) {
@@ -1167,8 +1239,27 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     }
     // Coalesce with any concurrent resolve of the same item (foreground jump vs.
     // background prefetch) so only one yt-dlp -g runs; the late caller awaits it.
+    //
+    // Sharing is only correct while the shared attempt SUCCEEDS. If it fails,
+    // the late caller must not inherit that failure: the background prefetch
+    // and the actual "this song starts now" load both land here, and a prefetch
+    // that failed a second earlier would otherwise decide the song can't play
+    // at all — the queue then stops with an error having never once asked
+    // YouTube on its own behalf. So a failed share falls through to a fresh
+    // attempt (bounded: the retry itself is not re-attempted here).
     const pending = inflightResolves.get(item.key);
-    if (pending) return pending;
+    if (pending) {
+      try {
+        return await pending;
+      } catch {
+        // Fall through and try again for this caller.
+      }
+      // A concurrent caller may already have started that fresh attempt.
+      const retrying = inflightResolves.get(item.key);
+      if (retrying && retrying !== pending) return retrying;
+      // The successful attempt of another caller may also have cached a URL.
+      if (source.url && streamUrlIsFresh(source.url)) return source.url;
+    }
     const p = (async () => {
       const resolved = await api.resolveStream(
         `https://www.youtube.com/watch?v=${source.videoId}`,
@@ -1400,6 +1491,19 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     });
     if (!started) {
       disarm();
+      // The outgoing song may have run out while the next one was failing to
+      // start. Its "ended" signal was swallowed during that attempt and will
+      // never come again, so advance the normal way now instead of sitting
+      // silent on a finished song.
+      const after = get();
+      if (
+        audio.activeEnded &&
+        after.isPlaying &&
+        after.index === startIndex &&
+        after._playbackCommandId === commandId
+      ) {
+        after.next();
+      }
       return;
     }
     const now = get();
