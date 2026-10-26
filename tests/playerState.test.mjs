@@ -430,6 +430,23 @@ test("a crossfade that fails after the old song ended still moves on", async () 
   assert.deepEqual(playingSources(), ["src:fade-end-b"]);
 });
 
+test("with Repeat One, Next skips but a song ending on its own replays", async () => {
+  const a = stream("repeat-a", "src:repeat-a");
+  const b = stream("repeat-b", "src:repeat-b");
+  await usePlayerStore.getState().playQueue([a, b]);
+  usePlayerStore.setState({ repeat: "one" });
+
+  audio.onEnded();
+  await flush();
+  assert.equal(usePlayerStore.getState().current()?.key, a.key);
+  assert.deepEqual(playingSources(), ["src:repeat-a"]);
+
+  usePlayerStore.getState().next();
+  await flush();
+  assert.equal(usePlayerStore.getState().current()?.key, b.key);
+  assert.deepEqual(playingSources(), ["src:repeat-b"]);
+});
+
 test("renaming a library song updates its live queue and now-playing copy", () => {
   const song = librarySong("rename", "Old title");
   const item = queuedLibrarySong("rename", "Old title");

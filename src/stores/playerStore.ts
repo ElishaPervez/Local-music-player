@@ -550,10 +550,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     }
     const { queue, index, repeat, shuffle } = get();
     if (queue.length === 0) return;
-    if (repeat === "one") {
-      void get()._load();
-      return;
-    }
+    // Repeat One only replays a song that ends on its own (see onEnded in
+    // initPlayer); Next always moves on.
     // The queue is already in play order (shuffle pre-arranges it), so Next
     // just walks forward. This keeps Previous correct and the order stable.
     let nextIndex = index + 1;
@@ -1544,8 +1542,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     // failed in a row — otherwise repeat-all would hammer dead sources forever.
     const failures = st._consecutiveErrors + 1;
     set({ _consecutiveErrors: failures });
-    // Under repeat-one, next() would reload the SAME failing track forever, so
-    // a broken track must stop playback rather than loop on itself.
+    // Under repeat-one a broken track stops playback rather than skipping
+    // away from the song the user asked to repeat.
     if (failures >= st.queue.length || st.repeat === "one") {
       audio.pause();
       set({
@@ -1573,6 +1571,7 @@ export function initPlayer() {
   audio.onEnded = () => {
     const player = usePlayerStore.getState();
     if (player.oneOffItem) void player._finishPlayOnce();
+    else if (player.repeat === "one") void player._load();
     else player.next();
   };
   audio.onError = (e) => usePlayerStore.getState()._onPlaybackError(e);
