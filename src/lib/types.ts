@@ -50,6 +50,12 @@ export interface Settings {
   discordPresence: boolean;
   /** Auto-append similar (streamed) songs to keep the queue going. */
   autoPlay: boolean;
+  /** Player volume (0..1), remembered between launches. */
+  volume: number;
+  /** Last shuffle setting, remembered between launches. */
+  shuffle: boolean;
+  /** Last repeat setting, remembered between launches. */
+  repeat: RepeatMode;
 }
 
 export type PlaybackSource =

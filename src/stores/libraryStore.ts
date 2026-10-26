@@ -37,6 +37,9 @@ const DEFAULT_SETTINGS: Settings = {
   stereoWiden: false,
   discordPresence: true,
   autoPlay: false,
+  volume: 0.8,
+  shuffle: false,
+  repeat: "off",
 };
 
 export const useLibraryStore = create<LibraryState>((set, get) => {
@@ -71,6 +74,16 @@ export const useLibraryStore = create<LibraryState>((set, get) => {
       set({ ...data, loaded: true });
       // Mirror the persisted crossfade preference into the player runtime.
       usePlayerStore.getState().setCrossfade(data.settings.crossfade);
+      // Restore the volume, shuffle and repeat the user left set last time.
+      // Done before auto-play below, which switches repeat off when it's on.
+      const volume = Number(data.settings.volume);
+      usePlayerStore
+        .getState()
+        .setVolume(Number.isFinite(volume) ? Math.min(1, Math.max(0, volume)) : 0.8);
+      usePlayerStore.setState({
+        shuffle: data.settings.shuffle,
+        repeat: data.settings.repeat,
+      });
       // The chain itself already exists (the visualiser listens through it);
       // this only opens the width up if the preference was saved as on.
       if (data.settings.stereoWiden) audio.setWiden(true);
@@ -217,6 +230,38 @@ export const useLibraryStore = create<LibraryState>((set, get) => {
       get().setSettings({ autoPlay: on });
     },
   };
+});
+
+// Save volume, shuffle and repeat with the other settings whenever they
+// change. The volume slider changes on every step of a drag, so the write is
+// held back until the value has settled for a moment.
+let playerControlsSaveTimer: ReturnType<typeof setTimeout> | null = null;
+const stopSavingPlayerControls = usePlayerStore.subscribe((player, prev) => {
+  if (
+    player.volume === prev.volume &&
+    player.shuffle === prev.shuffle &&
+    player.repeat === prev.repeat
+  )
+    return;
+  if (!useLibraryStore.getState().loaded) return;
+  if (playerControlsSaveTimer != null) clearTimeout(playerControlsSaveTimer);
+  playerControlsSaveTimer = setTimeout(() => {
+    playerControlsSaveTimer = null;
+    const { volume, shuffle, repeat } = usePlayerStore.getState();
+    const saved = useLibraryStore.getState().settings;
+    if (
+      saved.volume === volume &&
+      saved.shuffle === shuffle &&
+      saved.repeat === repeat
+    )
+      return;
+    useLibraryStore.getState().setSettings({ volume, shuffle, repeat });
+  }, 400);
+});
+// In dev, a hot reload replaces this store; the old copy must stop saving.
+import.meta.hot?.dispose(() => {
+  stopSavingPlayerControls();
+  if (playerControlsSaveTimer != null) clearTimeout(playerControlsSaveTimer);
 });
 
 // A dev hot reload of this module makes a fresh, empty store and the mount-only
