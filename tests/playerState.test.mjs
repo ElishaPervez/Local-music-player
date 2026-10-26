@@ -400,6 +400,24 @@ test("a stream that errors mid-song reloads at the same position", async () => {
   assert.equal(usePlayerStore.getState()._errorRetried, a.key);
 });
 
+test("a stream stuck waiting for data is reloaded from where it stopped", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const a = stream("stalled", "src:stalled-old");
+  await usePlayerStore.getState().playQueue([a, stream("stalled-next")]);
+  usePlayerStore.getState()._onTime(30, 180);
+  const el = FakeAudio.instances.find((x) => x.src === "src:stalled-old");
+  el.currentTime = 30;
+
+  for (const listener of el.listeners.get("waiting")) listener();
+  t.mock.timers.tick(15000);
+  await flush();
+  await flush();
+
+  const src = "resolved:https://www.youtube.com/watch?v=stalled";
+  assert.deepEqual(playingSources(), [src]);
+  assert.equal(usePlayerStore.getState().position, 30);
+});
+
 test("removing the incoming crossfade item silences it immediately", async () => {
   const a = stream("a", "src:a");
   const b = stream("b", "src:b");

@@ -7,6 +7,11 @@ const WIDE_SIDE_GAIN = 1.9;
 /** Seconds the width change ramps over, so flipping the toggle never clicks. */
 const WIDTH_RAMP_SEC = 0.15;
 
+/** How long playback may sit waiting for data before it is treated as a
+ *  failed stream. Without this a stalled connection stays silent (while the
+ *  UI shows "playing") until the stream proxy's own 120s read limit trips. */
+const STALL_TIMEOUT_MS = 15000;
+
 /**
  * Two HTMLAudioElements so playback can crossfade: while one track fades out,
  * the next plays and fades in on the other element. With crossfade off only the
@@ -54,6 +59,13 @@ class AudioController {
   onTime?: (current: number, duration: number) => void;
   onError?: (e: unknown) => void;
   private wired = false;
+  /** Pending "still no data" check for the active element, or null. */
+  private stallTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private clearStall() {
+    if (this.stallTimer != null) clearTimeout(this.stallTimer);
+    this.stallTimer = null;
+  }
 
   constructor() {
     this.els = [new Audio(), new Audio()];
@@ -218,6 +230,25 @@ class AudioController {
       el.addEventListener("error", () => {
         if (el === this.activeEl) this.onError?.(el.error);
       });
+      // Playback ran out of data. If it is still stuck at the same spot after
+      // STALL_TIMEOUT_MS, report it like an error so the player's retry path
+      // reloads the song from where it stopped.
+      el.addEventListener("waiting", () => {
+        if (el !== this.activeEl) return;
+        this.clearStall();
+        const stuckAt = el.currentTime;
+        this.stallTimer = setTimeout(() => {
+          this.stallTimer = null;
+          if (el === this.activeEl && !el.paused && el.currentTime === stuckAt) {
+            this.onError?.(new Error("Playback stalled waiting for data"));
+          }
+        }, STALL_TIMEOUT_MS);
+      });
+      for (const name of ["playing", "pause", "emptied"]) {
+        el.addEventListener(name, () => {
+          if (el === this.activeEl) this.clearStall();
+        });
+      }
     }
   }
 
