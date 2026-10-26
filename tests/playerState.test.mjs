@@ -361,6 +361,24 @@ test("after returning from a play-once song, Next starts the next song from 0:00
   assert.equal(el.currentTime, 0);
 });
 
+test("Play now in a shuffled playlist keeps its place when shuffle is turned off", async () => {
+  const songs = ["sh-a", "sh-b", "sh-c", "sh-d"].map((id) => stream(id, `src:${id}`));
+  await usePlayerStore.getState().playShuffled(songs);
+  const playingKey = usePlayerStore.getState().current().key;
+  const picked = stream("sh-picked", "src:sh-picked");
+  await usePlayerStore.getState().playNow(picked);
+
+  usePlayerStore.getState().toggleShuffle();
+
+  const expected = songs.map((s) => s.key);
+  expected.splice(expected.indexOf(playingKey) + 1, 0, picked.key);
+  assert.deepEqual(
+    usePlayerStore.getState().queue.map((s) => s.key),
+    expected,
+  );
+  assert.equal(usePlayerStore.getState().current()?.key, picked.key);
+});
+
 test("removing the incoming crossfade item silences it immediately", async () => {
   const a = stream("a", "src:a");
   const b = stream("b", "src:b");

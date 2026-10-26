@@ -425,14 +425,25 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   playNow: async (item) => {
-    const { queue, index } = get();
+    const { queue, index, naturalOrder } = get();
     const insertAt = index + 1;
     const newQueue = [...queue];
     newQueue.splice(insertAt, 0, item);
+    // While shuffled, also slot the pick into the saved un-shuffled order,
+    // right after the song that was playing. Otherwise turning shuffle off
+    // would push it to the end and the rest of the playlist would never play.
+    let newNatural = naturalOrder;
+    if (naturalOrder) {
+      const playingKey = queue[index]?.key;
+      const at = playingKey ? naturalOrder.indexOf(playingKey) : -1;
+      newNatural = [...naturalOrder];
+      newNatural.splice(at >= 0 ? at + 1 : newNatural.length, 0, item.key);
+    }
     // A deliberate user pick gets a clean slate — it must not inherit the
     // failure count from a prior run of auto-skipped broken tracks.
     set({
       queue: newQueue,
+      naturalOrder: newNatural,
       index: insertAt,
       oneOffItem: null,
       _oneOffResume: null,
