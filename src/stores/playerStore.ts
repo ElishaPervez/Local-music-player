@@ -1357,6 +1357,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         set({ position: 0, duration: 0 });
       return;
     }
+    const prevPosition = get().position;
     set({ position: cur || 0, duration: dur || 0 });
     const st = get();
     // A track that produces real playback time has demonstrably loaded, so the
@@ -1364,8 +1365,14 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     // past 0, so this never masks a genuine all-failing-queue stop.) Also clear
     // the one-shot stream-retry marker, so a track that recovers earns a fresh
     // retry the next time its URL goes stale (e.g. on a repeat-all second lap).
+    // Only time moving forward counts: a reload that resumes mid-song reports
+    // its saved position straight away, before any audio has actually played,
+    // and must not reset the retry guards or a broken stream would reload
+    // forever.
+    const advanced = cur > prevPosition && cur - prevPosition < 5;
     if (
       cur > 1 &&
+      advanced &&
       (st._consecutiveErrors !== 0 ||
         st._errorRetried !== null ||
         st.playbackError !== null)
@@ -1551,7 +1558,16 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       item.source.url &&
       st._errorRetried !== item.key
     ) {
-      set({ _errorRetried: item.key, _prefetchedFor: null });
+      // Pick up where the song broke off rather than restarting it at 0:00.
+      // A position still waiting to be applied (the reload itself failed
+      // before it could jump there) takes precedence over the 0 shown while
+      // loading.
+      set({
+        _errorRetried: item.key,
+        _prefetchedFor: null,
+        _resumePosition:
+          st._resumePosition ?? (st.position > 0 ? st.position : null),
+      });
       item.source.url = "";
       audio.clearPrime();
       void st._load();

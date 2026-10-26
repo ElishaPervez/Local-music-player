@@ -379,6 +379,27 @@ test("Play now in a shuffled playlist keeps its place when shuffle is turned off
   assert.equal(usePlayerStore.getState().current()?.key, picked.key);
 });
 
+test("a stream that errors mid-song reloads at the same position", async () => {
+  const a = stream("midsong", "src:midsong-old");
+  await usePlayerStore.getState().playQueue([a, stream("midsong-next")]);
+  usePlayerStore.getState()._onTime(90, 180);
+
+  audio.onError(new Error("network"));
+  await flush();
+  await flush();
+
+  const src = "resolved:https://www.youtube.com/watch?v=midsong";
+  assert.equal(usePlayerStore.getState().current()?.key, a.key);
+  assert.deepEqual(playingSources(), [src]);
+  assert.equal(usePlayerStore.getState().position, 90);
+  assert.equal(FakeAudio.instances.find((x) => x.src === src).currentTime, 90);
+
+  // Jumping back to 90s is not proof the stream recovered: a second error
+  // before any real playback must not trigger another endless reload.
+  usePlayerStore.getState()._onTime(90, 180);
+  assert.equal(usePlayerStore.getState()._errorRetried, a.key);
+});
+
 test("removing the incoming crossfade item silences it immediately", async () => {
   const a = stream("a", "src:a");
   const b = stream("b", "src:b");
