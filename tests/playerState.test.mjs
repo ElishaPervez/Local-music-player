@@ -67,6 +67,7 @@ const playerModule = await vite.ssrLoadModule("/src/stores/playerStore.ts");
 const audioModule = await vite.ssrLoadModule("/src/lib/audio.ts");
 const apiModule = await vite.ssrLoadModule("/src/lib/api.ts");
 const libraryModule = await vite.ssrLoadModule("/src/stores/libraryStore.ts");
+const downloadModule = await vite.ssrLoadModule("/src/lib/downloadService.ts");
 
 const { usePlayerStore, initPlayer } = playerModule;
 const { audio } = audioModule;
@@ -811,4 +812,32 @@ test("cached stream URLs are re-resolved once their embedded expiry passes", asy
   assert.equal(resolves, 1);
   assert.equal(src, "src:refreshed");
   assert.equal(item.source.url, "src:refreshed");
+});
+
+test("saving the queue links every saved row to its downloaded file", async () => {
+  const { saveQueueAsPlaylist } = downloadModule;
+  // One song is fetched by the save, the other was downloaded beforehand.
+  useLibraryStore.setState({
+    songs: { "save-old": librarySong("save-old") },
+    settings: { ...initialLibraryState.settings, libraryDir: "C:\\Music" },
+  });
+  api.downloadSong = async ({ videoId }) => ({
+    filePath: `C:\\Music\\${videoId}.m4a`,
+    track: `Song ${videoId}`,
+    artist: `Artist ${videoId}`,
+  });
+  usePlayerStore.setState({
+    queue: [stream("save-new"), stream("save-old")],
+    index: -1,
+  });
+
+  await saveQueueAsPlaylist("Saved mix");
+
+  assert.deepEqual(
+    usePlayerStore.getState().queue.map((item) => item.source),
+    [
+      { kind: "local", path: "C:\\Music\\save-new.m4a" },
+      { kind: "local", path: "C:\\Music\\save-old.m4a" },
+    ],
+  );
 });

@@ -158,9 +158,13 @@ export async function saveQueueAsPlaylist(name: string): Promise<string | null> 
   // resulting Song (or null on failure), positioned at its QUEUE index —
   // independent of completion order. ensureSongInLibrary swallows its own
   // errors, so one bad track returns null and never aborts the pool.
-  const songs = await runPool(results, SAVE_CONCURRENCY, (r) =>
-    ensureSongInLibrary(r),
-  );
+  // Each saved song is also linked back into the live queue, so its row plays
+  // the local file from then on instead of streaming it again.
+  const songs = await runPool(results, SAVE_CONCURRENCY, async (r) => {
+    const song = await ensureSongInLibrary(r);
+    if (song) usePlayerStore.getState().adoptDownloadedSong(song);
+    return song;
+  });
 
   // Build songIds strictly in queue order, dropping failed tracks and de-duping
   // while keeping first-occurrence position (matches addToPlaylist's de-dupe).

@@ -30,6 +30,7 @@ import { CSS } from "@dnd-kit/utilities";
 import type { PlaybackItem } from "../lib/types";
 import { usePlayerStore } from "../stores/playerStore";
 import { useDownloadsStore } from "../stores/downloadsStore";
+import { useLibraryStore } from "../stores/libraryStore";
 import { useUIStore, QUEUE_W_DEFAULT } from "../stores/uiStore";
 import { useFlipReorder } from "../lib/useFlipReorder";
 import { saveQueueAsPlaylist, ensureSongInLibrary } from "../lib/downloadService";
@@ -51,6 +52,10 @@ function QueueRow({
   const adoptDownloadedSong = usePlayerStore((s) => s.adoptDownloadedSong);
   // Live download state while this track is being saved into a playlist.
   const dl = useDownloadsStore((s) => s.byVideo[item.videoId]);
+  // A streamed row whose song is already in the library (downloaded earlier,
+  // or by a queue save) counts as downloaded too, not just local-file rows.
+  const inLibrary = useLibraryStore((s) => !!s.songs[item.videoId]?.filePath);
+  const downloaded = item.source.kind === "local" || inLibrary;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: item.key });
 
@@ -101,28 +106,43 @@ function QueueRow({
           {item.artist || "Unknown"}
         </span>
       </div>
-      {dl ? (
-        <span
-          className={`queue-dl ${dl.status}`}
-          title={
-            dl.status === "error"
-              ? "Download failed"
-              : dl.status === "done"
-                ? "Saved"
-                : `Downloading… ${Math.round(dl.percent)}%`
-          }
-        >
-          {dl.status === "downloading" ? (
-            `${Math.round(dl.percent)}%`
-          ) : dl.status === "done" ? (
+      <span className="queue-actions">
+        {!dl && (
+          <button
+            className="queue-action"
+            onClick={() => removeFromQueue(item.key)}
+            title="Remove from queue"
+          >
+            <X size={15} />
+          </button>
+        )}
+        {/* One fixed slot at the right edge for the download arrow, the live
+            percentage and the tick, so the status never jumps sideways. */}
+        {dl ? (
+          <span
+            className={`queue-dl ${dl.status}`}
+            title={
+              dl.status === "error"
+                ? "Download failed"
+                : dl.status === "done"
+                  ? "Saved"
+                  : `Downloading… ${Math.round(dl.percent)}%`
+            }
+          >
+            {dl.status === "downloading" ? (
+              `${Math.round(dl.percent)}%`
+            ) : dl.status === "done" ? (
+              <Check size={14} />
+            ) : (
+              <AlertCircle size={14} />
+            )}
+          </span>
+        ) : downloaded ? (
+          <span className="queue-dl done" title="Downloaded">
             <Check size={14} />
-          ) : (
-            <AlertCircle size={14} />
-          )}
-        </span>
-      ) : (
-        <span className="queue-actions">
-          {item.source.kind === "stream" && (
+          </span>
+        ) : (
+          <span className="queue-dl">
             <button
               className="queue-action queue-dl-btn"
               onClick={() => {
@@ -141,16 +161,9 @@ function QueueRow({
             >
               <Download size={14} />
             </button>
-          )}
-          <button
-            className="queue-action"
-            onClick={() => removeFromQueue(item.key)}
-            title="Remove from queue"
-          >
-            <X size={15} />
-          </button>
-        </span>
-      )}
+          </span>
+        )}
+      </span>
     </div>
   );
 }
