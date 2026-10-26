@@ -343,6 +343,24 @@ test("playing once returns a paused queue to paused at the saved timestamp", asy
   assert.deepEqual(playingSources(), ["src:paused-queue"]);
 });
 
+test("after returning from a play-once song, Next starts the next song from 0:00", async () => {
+  const a = stream("resume-a", "src:resume-a");
+  const b = stream("resume-b", "src:resume-b");
+  await usePlayerStore.getState().playQueue([a, b]);
+  usePlayerStore.getState()._onTime(150, 180);
+  usePlayerStore.getState().togglePlay();
+  await usePlayerStore.getState().playOnce(stream("resume-once", "src:resume-once"));
+  await usePlayerStore.getState()._finishPlayOnce();
+
+  usePlayerStore.getState().next();
+  await flush();
+
+  assert.equal(usePlayerStore.getState().current()?.key, b.key);
+  assert.equal(usePlayerStore.getState().position, 0);
+  const el = FakeAudio.instances.find((x) => x.src === "src:resume-b");
+  assert.equal(el.currentTime, 0);
+});
+
 test("removing the incoming crossfade item silences it immediately", async () => {
   const a = stream("a", "src:a");
   const b = stream("b", "src:b");

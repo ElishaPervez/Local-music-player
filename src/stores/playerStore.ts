@@ -586,7 +586,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     // possibly into a freshly reshuffled queue) is the primed track no longer next,
     // so the stale prime must be dropped.
     const wrapped = nextIndex <= index;
-    set({ index: nextIndex, _prefetchedFor: null });
+    // A timestamp saved for the song we're leaving must not carry over.
+    set({ index: nextIndex, _prefetchedFor: null, _resumePosition: null });
     if (wrapped) audio.clearPrime();
     void get()._load();
   },
@@ -604,7 +605,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const { position, index } = get();
     // If a crossfade is overlapping, drop back to the outgoing track first.
     audio.cancelCrossfade();
-    set({ crossfadeArmedFor: null, _prefetchedFor: null });
+    // Previous either restarts this song or goes to the one before; neither
+    // should jump to a timestamp saved for resuming this song.
+    set({ crossfadeArmedFor: null, _prefetchedFor: null, _resumePosition: null });
     audio.clearPrime();
     if (position > 3) {
       audio.seek(0);
@@ -848,7 +851,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     }
     if (i === index) {
       const newIndex = Math.min(index, newQueue.length - 1);
-      set({ queue: newQueue, index: newIndex, naturalOrder: newNatural });
+      set({
+        queue: newQueue,
+        index: newIndex,
+        naturalOrder: newNatural,
+        _resumePosition: null,
+      });
       if (newQueue.length > 0) {
         void get()._load();
       } else {
